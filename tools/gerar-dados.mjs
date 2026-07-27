@@ -13,7 +13,7 @@
  * docs/MODELO-DE-DADOS.md e nao muda.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -698,6 +698,28 @@ const LEITURA = {
 const semanas = montarSemanas();
 const { segmentos, linhas } = simular(semanas);
 
+/**
+ * Se `tools/kpis-do-inventario.json` existir (produzido por
+ * `python3 tools/importar-inventario.py`), as definicoes reais substituem as de
+ * exemplo. Campos iniciados por "_" sao anotacoes do importador e nao vao para
+ * o painel.
+ */
+let kpisEmUso = KPIS;
+const caminhoInventario = join(raiz, "tools", "kpis-do-inventario.json");
+if (existsSync(caminhoInventario)) {
+  const inv = JSON.parse(readFileSync(caminhoInventario, "utf8"));
+  kpisEmUso = inv.kpis.map((k) => Object.fromEntries(Object.entries(k).filter(([campo]) => !campo.startsWith("_"))));
+  console.log(`Usando ${kpisEmUso.length} indicadores de tools/kpis-do-inventario.json (origem: ${inv._origem}).`);
+  const faltando = inv.metricasCitadas.filter((m) => !METRICAS.includes(m));
+  if (faltando.length) {
+    console.warn(
+      `AVISO: ${faltando.length} metrica(s) citada(s) nas formulas nao existem nos fatos gerados: ${faltando.join(", ")}.\n` +
+        "  Esses indicadores vao aparecer como 'nao apurado' ate que o extrator produza essas colunas."
+    );
+  }
+  if (inv.avisos && inv.avisos.length) console.warn(`${inv.avisos.length} ponto(s) a revisar — veja a saida do importador.`);
+}
+
 const dados = {
   meta: {
     titulo: "Farol de KPIs de RH",
@@ -712,7 +734,7 @@ const dados = {
   fatos: { colunas: ["seg", "semana", ...METRICAS], linhas },
   metricas: METRICAS,
   estoques: ["hc_fim", "hc_orcado", "vagas_abertas", "hc_lid", "hc_lid_fem"],
-  kpis: KPIS,
+  kpis: kpisEmUso,
   comentarios: COMENTARIOS,
   leitura: LEITURA,
 };
@@ -732,6 +754,6 @@ writeFileSync(htmlPath, html);
 
 console.log(
   `dados.json e index.html atualizados — ${linhas.length} linhas de fato, ` +
-    `${segmentos.length} segmentos, ${semanas.length} semanas, ${KPIS.length} KPIs ` +
+    `${segmentos.length} segmentos, ${semanas.length} semanas, ${kpisEmUso.length} KPIs ` +
     `(${(json.length / 1024).toFixed(0)} KB).`
 );

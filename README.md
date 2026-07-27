@@ -88,12 +88,28 @@ Acrescentar, remover ou renomear indicadores é editar o array `KPIS` em
 ## Estrutura
 
 ```
-index.html                 painel completo — HTML, CSS, JS e dados em um arquivo
-dados.json                 os mesmos dados soltos, para inspeção e para o BI
-tools/gerar-dados.mjs      gera os dados e reinjeta o bloco em index.html
-tools/apurar.mjs           apura os KPIs no terminal, com as mesmas regras
-docs/MODELO-DE-DADOS.md    contrato de dados: métricas, fórmulas, metas, janelas
+index.html                       painel completo — HTML, CSS, JS e dados em um arquivo
+dados.json                       os mesmos dados soltos, para inspeção e para o BI
+inventario-indicadores.xlsx      formulário de entrada: seus indicadores, componentes e de-para
+tools/gerar-dados.mjs            gera os dados e reinjeta o bloco em index.html
+tools/apurar.mjs                 apura os KPIs no terminal, com as mesmas regras
+tools/criar-inventario.py        gera a planilha de inventário em branco
+tools/importar-inventario.py     lê a planilha preenchida e escreve as definições de KPI
+tools/gerar-artifact.mjs         extrai a versão para hospedar como página
+docs/MODELO-DE-DADOS.md          contrato de dados: métricas, fórmulas, metas, janelas
+docs/TELA-A-TELA.md              como migrar da apresentação atual para o painel
 ```
+
+### Trazer os seus indicadores
+
+```bash
+python3 tools/criar-inventario.py       # planilha em branco
+#  ... preencher inventario-indicadores.xlsx ...
+python3 tools/importar-inventario.py    # vira definições de KPI + lista de métricas necessárias
+node tools/gerar-dados.mjs              # o painel passa a usar os seus indicadores
+```
+
+O processo está descrito em [`docs/TELA-A-TELA.md`](docs/TELA-A-TELA.md).
 
 ### Atualizar os dados
 
