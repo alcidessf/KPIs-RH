@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movimentações — Status semanal</title>
+<style>
+/* ============================================================================
+   PAINEL DE MOVIMENTAÇÕES — arquivo único, sem dependência externa.
+   Roda de pasta de rede, por duplo clique. Não faz nenhuma chamada de rede.
+
+   O bloco .slide é 16:9: um print dele entra num slide de PPT sem sobra.
+   Todas as medidas de dentro do slide estão em cqw (percentual da largura do
+   container), então a tela inteira escala como uma peça só.
+
+   Cores: paleta institucional. As variantes de farol foram escolhidas por
+   contraste medido sobre o papel #F7F8F5 — o amarelo institucional #D6C500
+   tem 1,66:1 e não pode carregar significado sozinho, por isso a marca usa
+   #877C00 (4,01:1) e o amarelo puro só aparece como preenchimento de chip.
+   ============================================================================ */
+
+:root {
+  /* --- paleta institucional --- */
+  --verde-escuro:  #2E4C46;
+  --verde:         #00694A;
+  --verde-claro:   #5FB35A;
+  --amarelo:       #D6C500;
+  --verde-palha:   #DCE6A6;
+  --azul:          #1C6D96;
+  --tijolo:        #B54728;
+  --terracota:     #C56C33;
+  --ocre:          #CC9433;
+
+  /* --- superfícies e tinta --- */
+  --papel:   #F7F8F5;
+  --cartao:  #FFFFFF;
+  --fio:     #E3E7E0;
+  --fio-forte: #CBD2CA;
+  --tinta:   #1E2A26;
+  --tinta-2: #4A5751;
+  --tinta-3: #6E7873;
+
+  /* --- farol (contraste verificado) --- */
+  --bom-marca: #00694A;  --bom-chip: #E4F0EA;  --bom-txt: #00563C;
+  --atn-marca: #877C00;  --atn-chip: #FAF4D0;  --atn-txt: #6E6400;
+  --cri-marca: #B54728;  --cri-chip: #F7E7E1;  --cri-txt: #8E3720;
+  --neu-marca: #6E7873;  --neu-chip: #EDEFEA;  --neu-txt: #5A6560;
+
+  --fonte: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #E9ECE7; color: var(--tinta);
+  font-family: var(--fonte); -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, dl, dd, dt, ol, li, figure { margin: 0; padding: 0; }
+ol { list-style: none; }
+
+/* ====================== barra de ferramentas (fora do slide) ============== */
+.ferramentas {
+  max-width: 1600px; margin: 0 auto; padding: 10px 4px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.ferramentas .marca { font-size: 12px; font-weight: 700; color: var(--verde-escuro); margin-right: auto; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 0 12px; border-radius: 7px; cursor: pointer;
+  background: #fff; color: var(--tinta-2); border: 1px solid var(--fio-forte);
+  font: 600 12px var(--fonte);
+}
+.btn:hover { background: var(--papel); color: var(--tinta); }
+.btn.primario { background: var(--verde); color: #fff; border-color: var(--verde); }
+.btn.primario:hover { background: #00563C; color: #fff; }
+.btn:focus-visible, [contenteditable]:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
+
+.painel-dados {
+  max-width: 1600px; margin: 0 auto 10px; padding: 14px 16px;
+  background: #fff; border: 1px solid var(--fio-forte); border-radius: 10px;
+}
+.painel-dados[hidden] { display: none; }
+.painel-dados h2 { font-size: 13px; color: var(--verde-escuro); margin-bottom: 4px; }
+.painel-dados p { font-size: 12px; color: var(--tinta-2); line-height: 1.5; margin-bottom: 10px; }
+.painel-dados textarea {
+  width: 100%; min-height: 150px; padding: 10px; border: 1px solid var(--fio-forte);
+  border-radius: 7px; font: 12px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  resize: vertical; background: var(--papel); color: var(--tinta);
+}
+.painel-acoes { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.aviso { font-size: 12px; font-weight: 600; }
+.aviso[data-t="erro"] { color: var(--cri-txt); }
+.aviso[data-t="ok"]   { color: var(--bom-txt); }
+
+/* ====================== o slide 16:9 ===================================== */
+.slide {
+  container-type: inline-size;
+  width: 100%; max-width: 1600px; aspect-ratio: 16 / 9;
+  margin: 0 auto; background: var(--papel);
+  border: 1px solid var(--fio-forte);
+  padding: 1.4cqw 1.6cqw;
+  display: flex; flex-direction: column; gap: 0.85cqw;
+  overflow: hidden;
+}
+
+/* --- cabeçalho --- */
+.cabecalho { display: flex; align-items: center; gap: 1cqw; }
+.logo {
+  height: 2.6cqw; width: auto; max-width: 11cqw; object-fit: contain; flex: none;
+}
+.logo-vazio {
+  height: 2.6cqw; width: 7cqw; flex: none; border: 1px dashed var(--fio-forte);
+  border-radius: 0.25cqw; display: flex; align-items: center; justify-content: center;
+  font-size: 0.6cqw; letter-spacing: .12em; color: var(--tinta-3);
+}
+/* display:flex sobrepõe o atributo hidden — sem isto o placeholder fica visível
+   ao lado da logo real */
+.logo-vazio[hidden] { display: none; }
+.cabecalho .divisor { width: 1px; align-self: stretch; background: var(--fio); }
+.cabecalho h1 { font-size: 1.35cqw; font-weight: 700; color: var(--verde-escuro); letter-spacing: -.01em; }
+.cabecalho .sub { font-size: 0.75cqw; color: var(--tinta-3); margin-top: 0.1cqw; }
+.cabecalho .selo {
+  margin-left: auto; font-size: 0.66cqw; font-weight: 700; color: var(--atn-txt);
+  background: var(--atn-chip); border: 1px solid rgba(135, 124, 0, .3);
+  padding: 0.25cqw 0.6cqw; border-radius: 999px; white-space: nowrap;
+}
+.cabecalho .selo[hidden] { display: none; }
+
+/* --- filtros --- */
+.filtros {
+  display: flex; align-items: center; gap: 0.5cqw; flex-wrap: nowrap;
+  background: var(--cartao); border: 1px solid var(--fio); border-radius: 0.5cqw;
+  padding: 0.45cqw 0.7cqw;
+}
+.filtro {
+  display: inline-flex; align-items: center; gap: 0.35cqw;
+  font-size: 0.72cqw; color: var(--tinta-3); white-space: nowrap;
+  padding: 0.3cqw 0.6cqw; border: 1px solid var(--fio); border-radius: 0.35cqw;
+}
+.filtro b { color: var(--tinta-2); font-weight: 600; }
+.filtro::after { content: "▾"; font-size: 0.55cqw; }
+.janela { display: flex; gap: 0.1cqw; padding: 0.12cqw; background: var(--papel); border: 1px solid var(--fio); border-radius: 0.4cqw; }
+.janela span { padding: 0.28cqw 0.75cqw; border-radius: 0.3cqw; font-size: 0.72cqw; font-weight: 600; color: var(--tinta-3); }
+.janela span[data-on] { background: var(--verde); color: #fff; }
+.regua { margin-left: auto; font-size: 0.72cqw; color: var(--tinta-3); white-space: nowrap; }
+
+/* --- grade --- */
+.linha { display: grid; gap: 0.85cqw; }
+/* as duas faixas repartem a altura livre do slide 16:9 */
+.linha-a { grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 1.06; }
+.linha-b { flex: 1; }
+.linha-b { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.3fr); }
+.linha > .cartao { height: 100%; }
+
+.cartao {
+  background: var(--cartao); border: 1px solid var(--fio); border-radius: 0.5cqw;
+  padding: 0.9cqw 0.95cqw 0; position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.cartao::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 0.2cqw; background: var(--faixa); }
+.cartao[data-s="bom"]     { --faixa: var(--bom-marca); }
+.cartao[data-s="atencao"] { --faixa: var(--atn-marca); }
+.cartao[data-s="critico"] { --faixa: var(--cri-marca); }
+.cartao[data-s="nd"]      { --faixa: var(--neu-marca); }
+.cartao.sem-grafico { padding-bottom: 0.9cqw; }
+
+.cartao-topo { display: flex; align-items: center; gap: 0.5cqw; margin-bottom: 0.7cqw; }
+.cartao h3 { font-size: 0.9cqw; font-weight: 700; color: var(--tinta); white-space: nowrap; }
+.chip {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 0.2cqw;
+  padding: 0.18cqw 0.5cqw; border-radius: 999px;
+  font-size: 0.66cqw; font-weight: 700; white-space: nowrap;
+}
+.chip[data-s="bom"]     { background: var(--bom-chip); color: var(--bom-txt); }
+.chip[data-s="atencao"] { background: var(--atn-chip); color: var(--atn-txt); }
+.chip[data-s="critico"] { background: var(--cri-chip); color: var(--cri-txt); }
+.chip[data-s="nd"]      { background: var(--neu-chip); color: var(--neu-txt); }
+
+.heroi { display: flex; align-items: baseline; gap: 0.75cqw; margin-bottom: 0.85cqw; }
+.heroi .grande { font-size: 2cqw; font-weight: 700; letter-spacing: -.03em; line-height: 1; color: var(--verde-escuro); }
+.heroi .grande small { font-size: 0.9cqw; font-weight: 600; color: var(--tinta-3); margin-left: 0.1cqw; }
+.heroi .lado {
+  font-size: 0.9cqw; font-weight: 700; color: var(--tinta);
+  padding-left: 0.7cqw; border-left: 1px solid var(--fio); font-variant-numeric: tabular-nums;
+}
+.heroi .lado span { font-size: 0.66cqw; font-weight: 500; color: var(--tinta-3); margin-left: 0.25cqw; }
+
+.analises { display: grid; flex: 1; grid-auto-rows: 1fr; align-content: stretch; }
+.analises > div {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 0.7cqw; align-items: center;
+  padding: 0.35cqw 0; border-top: 1px solid var(--fio); min-height: 1.9cqw;
+}
+.analises dt { font-size: 0.75cqw; color: var(--tinta-3); white-space: nowrap; }
+.analises .base { font-size: 0.75cqw; color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+.analises .var {
+  font-size: 0.75cqw; font-weight: 700; font-variant-numeric: tabular-nums;
+  white-space: nowrap; min-width: 3.6cqw; text-align: right;
+}
+.var[data-s="bom"]    { color: var(--bom-txt); }
+.var[data-s="ruim"]   { color: var(--cri-txt); }
+.var[data-s="neutro"] { color: var(--tinta-3); }
+.falta {
+  font-size: 0.62cqw; color: var(--tinta-3);
+  border: 1px dashed var(--fio-forte); border-radius: 0.25cqw; padding: 0 0.35cqw; white-space: nowrap;
+}
+
+.tendencia { margin: 0.7cqw -0.95cqw 0; border-top: 1px solid var(--fio); }
+.tendencia svg { display: block; width: 100%; height: 2.6cqw; }
+.tendencia.vazia { height: 2.7cqw; display: flex; align-items: center; justify-content: center; }
+.tendencia.vazia span { font-size: 0.62cqw; color: var(--tinta-3); }
+
+/* --- listas --- */
+.duplo { display: grid; grid-template-columns: 1fr 1fr; gap: 1cqw; }
+.mini {
+  font-size: 0.62cqw; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--tinta-3); margin-bottom: 0.5cqw; display: block; white-space: nowrap;
+}
+.rank { display: grid; gap: 0.45cqw; }
+.rank li { display: grid; grid-template-columns: 1fr auto; gap: 0.5cqw; align-items: baseline; font-size: 0.75cqw; }
+.rank .nome { color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank .val { color: var(--tinta); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank .barra { grid-column: 1 / -1; height: 0.15cqw; border-radius: 0.1cqw; background: var(--fio); overflow: hidden; }
+.rank .barra i { display: block; height: 100%; background: var(--cor, var(--verde-claro)); }
+
+table.dir { width: 100%; border-collapse: collapse; font-size: 0.75cqw; }
+table.dir th {
+  text-align: right; font-size: 0.62cqw; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--tinta-3); font-weight: 700; padding: 0 0 0.4cqw;
+}
+table.dir th:first-child, table.dir td:first-child { text-align: left; }
+table.dir td { text-align: right; padding: 0.35cqw 0; border-top: 1px solid var(--fio); font-variant-numeric: tabular-nums; color: var(--tinta-2); }
+table.dir td:first-child { color: var(--tinta); font-weight: 700; }
+table.dir td.forte { color: var(--tinta); font-weight: 700; }
+
+.nota { margin-top: auto; padding-top: 0.6cqw; font-size: 0.62cqw; line-height: 1.5; color: var(--tinta-3); }
+.nota b { color: var(--atn-txt); font-weight: 700; }
+
+.insight {
+  background: var(--cartao); border: 1px solid var(--fio); border-left: 0.2cqw solid var(--verde);
+  border-radius: 0.5cqw; padding: 0.7cqw 0.95cqw;
+}
+.insight p { font-size: 0.75cqw; line-height: 1.55; color: var(--tinta-2); }
+.insight strong { color: var(--tinta); font-weight: 700; }
+
+/* texto editável: afordância discreta, só na intenção */
+[contenteditable="true"]:hover { outline: 1px dashed var(--fio-forte); outline-offset: 0.2cqw; border-radius: 2px; }
+
+/* ====================== celular: empilha, sem 16:9 ======================= */
+@media (max-width: 900px) {
+  .slide {
+    aspect-ratio: auto; max-width: none; container-type: normal;
+    padding: 14px; gap: 10px; border: 0;
+  }
+  .slide, .slide * { font-size: revert; }
+  .cabecalho h1 { font-size: 17px; } .cabecalho .sub { font-size: 12px; }
+  .cabecalho .selo { font-size: 10px; padding: 3px 8px; }
+  .logo, .logo-vazio { height: 28px; width: auto; }
+  .logo-vazio { width: 74px; font-size: 8px; }
+  .filtros { flex-wrap: wrap; padding: 8px; border-radius: 8px; }
+  .filtro, .janela span, .regua { font-size: 12px; }
+  .filtro { padding: 5px 9px; border-radius: 6px; }
+  .janela span { padding: 5px 11px; border-radius: 6px; }
+  .linha { gap: 10px; }
+  .linha-a, .linha-b { flex: none; }
+  .analises { flex: none; grid-auto-rows: auto; }
+  .analises > div { min-height: 0; }
+  .linha-a, .linha-b { grid-template-columns: minmax(0, 1fr); }
+  .duplo { grid-template-columns: minmax(0, 1fr); }
+  .cartao { padding: 14px 14px 0; border-radius: 10px; }
+  .cartao::before { width: 3px; }
+  .cartao.sem-grafico { padding-bottom: 14px; }
+  .cartao h3 { font-size: 14px; } .chip { font-size: 10.5px; padding: 3px 8px; }
+  .heroi .grande { font-size: 30px; } .heroi .grande small, .heroi .lado { font-size: 14px; }
+  .heroi .lado span { font-size: 10.5px; }
+  .analises dt, .analises .base, .analises .var { font-size: 12px; }
+  .analises > div { padding: 6px 0; gap: 10px; }
+  .falta, .mini, .nota, .tendencia.vazia span, table.dir th { font-size: 10.5px; }
+  .rank li, table.dir, .insight p { font-size: 12px; }
+  .rank .barra { height: 2px; }
+  .tendencia { margin: 10px -14px 0; } .tendencia svg, .tendencia.vazia { height: 40px; }
+  .insight { padding: 12px 14px; border-left-width: 3px; border-radius: 10px; }
+}
+
+/* ====================== impressão: só o slide ============================ */
+@media print {
+  body { background: #fff; }
+  .ferramentas, .painel-dados { display: none !important; }
+  .slide { border: 0; max-width: none; width: 100%; }
+  @page { size: landscape; margin: 8mm; }
+}
+</style>
+</head>
+<body>
+
+<!-- ======= barra de ferramentas: não entra no print do slide ======= -->
+<div class="ferramentas">
+  <span class="marca">Painel de movimentações</span>
+  <button class="btn" id="btn-dados" type="button" aria-expanded="false" aria-controls="painel-dados">Atualizar dados</button>
+  <label class="btn" for="arq-logo">Trocar logo</label>
+  <input type="file" id="arq-logo" accept="image/png,image/jpeg,image/svg+xml" hidden>
+  <button class="btn" id="btn-imprimir" type="button">Imprimir / PDF</button>
+  <button class="btn primario" id="btn-salvar" type="button">Salvar semana</button>
+</div>
+
+<section class="painel-dados" id="painel-dados" hidden>
+  <h2>Colar os dados da semana</h2>
+  <p>
+    Abra <b>modelo-semanal.xlsx</b>, selecione tudo na aba <b>Dados</b> (Ctrl+A), copie (Ctrl+C) e cole aqui.
+    A tela é redesenhada na hora. Depois use <b>Salvar semana</b> para gerar o arquivo que vai para a pasta de rede.
+  </p>
+  <textarea id="colagem" spellcheck="false" aria-label="Área para colar os dados vindos do Excel"
+            placeholder="Cole aqui o conteúdo copiado do Excel…"></textarea>
+  <div class="painel-acoes">
+    <button class="btn primario" id="btn-aplicar" type="button">Aplicar</button>
+    <button class="btn" id="btn-exemplo" type="button">Ver o formato esperado</button>
+    <span class="aviso" id="aviso"></span>
+  </div>
+</section>
+
+<!-- ======= o slide 16:9 ======= -->
+<main class="slide" id="slide">
+
+  <header class="cabecalho">
+    <img class="logo" id="logo" alt="Logo da empresa" hidden>
+    <div class="logo-vazio" id="logo-vazio">LOGO</div>
+    <div class="divisor"></div>
+    <div>
+      <h1 id="titulo">Movimentações</h1>
+      <p class="sub" id="subtitulo"></p>
+    </div>
+    <span class="selo" id="selo-falta" hidden></span>
+  </header>
+
+  <div class="filtros">
+    <span class="filtro">Empresa: <b id="f-empresa">Todas</b></span>
+    <span class="filtro">Diretoria: <b id="f-diretoria">Todas</b></span>
+    <span class="filtro">Área: <b id="f-area">Todas</b></span>
+    <div class="janela"><span>Semana</span><span data-on>Mês</span><span>Ano</span></div>
+    <span class="regua" id="regua"></span>
+  </div>
+
+  <div class="linha linha-a" id="linha-kpi"></div>
+  <div class="linha linha-b" id="linha-perfil"></div>
+
+  <div class="insight">
+    <p id="insight" contenteditable="true" role="textbox" aria-multiline="true"></p>
+  </div>
+</main>
+
+<!-- ======= dados da semana: é este bloco que o "Salvar semana" reescreve ======= -->
+<script id="dados" type="application/json">
+{
+ "meta": {
+  "titulo": "Movimentações",
+  "periodo": "Julho 2026",
+  "semana": "30",
+  "recorte": "Consolidado — todas as empresas",
+  "regua": "MTD com 4 de 4,4 semanas",
+  "logo": ""
+ },
+ "kpis": [
+  { "id": "turnover", "titulo": "Turnover geral", "taxa": 1.70, "qtd": 91, "unidade": "saídas",
+    "semQtd": 19, "semTaxa": 0.36, "mesAntRotulo": "Junho", "mesAnt": 123,
+    "mediaAtual": 119, "mediaAnt": 105, "direcao": "menor", "estado": "auto",
+    "serie": [93, 147, 116, 119, 115, 123, 91] },
+  { "id": "voluntario", "titulo": "Voluntários", "taxa": 0.92, "qtd": 49, "unidade": "saídas",
+    "semQtd": 7, "semTaxa": 0.13, "mesAntRotulo": "Junho", "mesAnt": 78,
+    "mediaAtual": 75.3, "mediaAnt": 74.6, "direcao": "menor", "estado": "auto",
+    "serie": [69, 63, 82, 82, 78, 78, 49] },
+  { "id": "involuntario", "titulo": "Involuntários", "taxa": 0.79, "qtd": 42, "unidade": "saídas",
+    "semQtd": 12, "semTaxa": 0.22, "mesAntRotulo": "Junho", "mesAnt": 45,
+    "mediaAtual": 43.5, "mediaAnt": 32.7, "direcao": "menor", "estado": "auto",
+    "serie": [24, 84, 34, 37, 37, 45, 42] },
+  { "id": "admitidos", "titulo": "Admitidos", "taxa": 1.46, "qtd": 78, "unidade": "entradas",
+    "semQtd": null, "semTaxa": null, "mesAntRotulo": "Junho", "mesAnt": 85,
+    "mediaAtual": null, "mediaAnt": null, "direcao": "", "estado": "auto",
+    "serie": [] }
+ ],
+ "perfil": [
+  { "id": "lideres", "titulo": "Líderes desligados", "valor": 9, "pct": 9.9, "pctRotulo": "das saídas",
+    "incidenciaRotulo": "Taxa sobre líderes", "incidencia": null,
+    "mesAntRotulo": "Junho", "mesAnt": 4, "mediaAtual": null, "mediaAnt": null,
+    "direcao": "menor", "estado": "auto" },
+  { "id": "ate1ano", "titulo": "Até 1 ano", "valor": 32, "pct": 35.2, "pctRotulo": "das saídas",
+    "incidenciaRotulo": "Taxa de incidência", "incidencia": null,
+    "mesAntRotulo": "Junho", "mesAnt": null, "mediaAtual": null, "mediaAnt": null,
+    "direcao": "menor", "estado": "auto" }
+ ],
+ "motivos": {
+  "estado": "atencao", "chip": "Codificação frágil",
+  "familias": [
+   { "nome": "Voluntário", "total": 49, "itens": [
+     { "motivo": "Particular", "qtd": 40 }, { "motivo": "Proposta externa", "qtd": 4 }, { "motivo": "Mudança de cidade", "qtd": 2 } ] },
+   { "nome": "Involuntário", "total": 42, "itens": [
+     { "motivo": "Performance", "qtd": 16 }, { "motivo": "Cultura organizacional", "qtd": 7 }, { "motivo": "Redução de quadro", "qtd": 7 } ] }
+  ],
+  "nota": "<b>“Particular” = 82% dos pedidos de demissão.</b> O motivo mais frequente é “não sabemos”: achado de codificação, não de visualização."
+ },
+ "diretorias": {
+  "estado": "nd", "chip": "Por volume",
+  "linhas": [
+   { "sigla": "FLO", "vol": 32, "inv": 29, "total": 61, "pct": 67.0, "taxa": null, "indice": null },
+   { "sigla": "IND", "vol": 6, "inv": 6, "total": 12, "pct": 13.2, "taxa": null, "indice": null },
+   { "sigla": "TRP", "vol": 6, "inv": 1, "total": 7, "pct": 7.7, "taxa": null, "indice": null }
+  ],
+  "nota": "<b>Ranking de tamanho, não de risco.</b> Falta headcount por diretoria para calcular taxa e índice de sobre-representação."
+ },
+ "insight": "<strong>Julho:</strong> volume desacelera 26% vs junho, puxado pelo voluntário (−37%). <strong>Atenção no involuntário</strong> — igual à média de 2026, mas <strong>+28% acima da média de 2025</strong>: a régua muda o sinal. <strong>Alerta nos líderes:</strong> 9 saídas contra 4 em junho, e sem o total de líderes não dá para dizer se 9 é muito."
+}
+</script>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   1. Formatação
+   ========================================================================== */
+const nf = (c) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: c, maximumFractionDigits: c });
+const N0 = nf(0), N1 = nf(1), N2 = nf(2);
+const vazio = (v) => v === null || v === undefined || v === "";
+
+/** Número com o mínimo de casas necessário: 119 e 75,3 na mesma coluna. */
+function num(v) {
+  if (vazio(v)) return null;
+  return Number.isInteger(v) ? N0.format(v) : N1.format(v);
+}
+
+/* ==========================================================================
+   2. Variação e farol
+   ========================================================================== */
+/**
+ * Compara valor com base. Devolve o texto, a seta e o sentido.
+ * Sentido depende da direção do indicador: sem direção declarada, a variação
+ * existe mas não é julgada — é o caso de Admitidos.
+ */
+function variacao(valor, base, direcao) {
+  if (vazio(valor) || vazio(base) || base === 0) return null;
+  const dif = valor - base;
+  const rel = Math.abs(dif / base) * 100;
+  const magnitude = N1.format(rel);
+  const nulo = Number(magnitude.replace(",", ".")) === 0;
+  let sentido = "neutro";
+  if (!nulo && direcao === "menor") sentido = dif < 0 ? "bom" : "ruim";
+  if (!nulo && direcao === "maior") sentido = dif > 0 ? "bom" : "ruim";
+  return {
+    sentido,
+    texto: nulo ? "estável" : (dif > 0 ? "▲ " : "▼ ") + magnitude + "%",
+    ruim: sentido === "ruim",
+  };
+}
+
+const ROTULO = { bom: "Melhorou", atencao: "Atenção", critico: "Piorou", nd: "Sem direção" };
+
+/**
+ * Farol automático: conta quantas comparações DISPONÍVEIS estão piores.
+ *   nenhuma pior            -> verde
+ *   até metade piores       -> amarelo
+ *   mais da metade piores   -> vermelho
+ * Sem direção declarada, não há como julgar: cinza.
+ * O Excel pode sobrepor com bom/atencao/critico/nd na coluna "estado".
+ */
+function farol(variacoes, direcao, forcado) {
+  if (forcado && forcado !== "auto") return forcado;
+  if (!direcao) return "nd";
+  const validas = variacoes.filter(Boolean);
+  if (!validas.length) return "nd";
+  const piores = validas.filter((v) => v.ruim).length;
+  if (piores === 0) return "bom";
+  return piores / validas.length > 0.5 ? "critico" : "atencao";
+}
+
+/* ==========================================================================
+   3. Desenho da tendência
+   ========================================================================== */
+const COR_FAROL = { bom: "var(--bom-marca)", atencao: "var(--atn-marca)", critico: "var(--cri-marca)", nd: "var(--neu-marca)" };
+
+function sparkline(serie, estado) {
+  if (!serie || serie.length < 2) {
+    return `<div class="tendencia vazia"><span>série mensal sem dado</span></div>`;
+  }
+  const min = Math.min(...serie), max = Math.max(...serie);
+  const amplitude = max - min || 1;
+  const pts = serie.map((v, i) => {
+    const x = (i * 300) / (serie.length - 1);
+    const y = 34 - ((v - min) / amplitude) * 26;
+    return `${x.toFixed(0)} ${y.toFixed(1)}`;
+  });
+  const linha = "M" + pts.join(" L");
+  const cor = COR_FAROL[estado] || COR_FAROL.nd;
+  const rotulo = `Tendência mensal: ${serie.join(", ")}`;
+  return `<div class="tendencia">
+    <svg viewBox="0 0 300 42" preserveAspectRatio="none" role="img" aria-label="${rotulo}">
+      <path d="${linha} L300 42 L0 42 Z" fill="${cor}" opacity=".1"/>
+      <path d="${linha}" fill="none" stroke="${cor}" stroke-width="1.5" stroke-linejoin="round" opacity=".85" vector-effect="non-scaling-stroke"/>
+    </svg>
+  </div>`;
+}
+
+/* ==========================================================================
+   4. Montagem dos cartões
+   ========================================================================== */
+let faltantes = 0;
+
+/**
+ * Uma linha de análise: rótulo, valor de referência e variação.
+ * Sem referência e sem variação, a linha inteira vira um único "sem dado" —
+ * nunca duas marcações de ausência na mesma linha.
+ */
+function linhaAnalise(rotulo, base, v, direita) {
+  if (vazio(base) && !v && !direita) {
+    faltantes++;
+    return `<div><dt>${rotulo}</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>`;
+  }
+  const ref = vazio(base) ? `<dd class="base"></dd>` : `<dd class="base">${num(base)}</dd>`;
+  const dir = direita !== undefined
+    ? `<dd class="var" data-s="neutro">${direita}</dd>`
+    : (v ? `<dd class="var" data-s="${v.sentido}">${v.texto}</dd>` : `<dd class="var" data-s="neutro">—</dd>`);
+  return `<div><dt>${rotulo}</dt>${ref}${dir}</div>`;
+}
+
+function cartaoKpi(k) {
+  const vMes = variacao(k.qtd, k.mesAnt, k.direcao);
+  const vA = variacao(k.qtd, k.mediaAtual, k.direcao);
+  const vB = variacao(k.qtd, k.mediaAnt, k.direcao);
+  const estado = farol([vMes, vA, vB], k.direcao, k.estado);
+
+  const linhas = [
+    linhaAnalise("Semana " + DADOS.meta.semana, k.semQtd, null,
+      vazio(k.semTaxa) ? undefined : N2.format(k.semTaxa) + "%"),
+    linhaAnalise(k.mesAntRotulo || "Mês anterior", k.mesAnt, vMes),
+    linhaAnalise("Média/mês " + ANO, k.mediaAtual, vA),
+    linhaAnalise("Média/mês " + (ANO - 1), k.mediaAnt, vB),
+  ].join("");
+
+  return `<article class="cartao" data-s="${estado}">
+    <div class="cartao-topo"><h3>${k.titulo}</h3><span class="chip" data-s="${estado}">${ROTULO[estado]}</span></div>
+    <div class="heroi">
+      <span class="grande">${vazio(k.taxa) ? "—" : N2.format(k.taxa) + "<small>%</small>"}</span>
+      <span class="lado">${vazio(k.qtd) ? "—" : N0.format(k.qtd)}<span>${k.unidade || ""}</span></span>
+    </div>
+    <dl class="analises">${linhas}</dl>
+    ${sparkline(k.serie, estado)}
+  </article>`;
+}
+
+function cartaoPerfil(p) {
+  const vMes = variacao(p.valor, p.mesAnt, p.direcao);
+  const vA = variacao(p.valor, p.mediaAtual, p.direcao);
+  const vB = variacao(p.valor, p.mediaAnt, p.direcao);
+  const estado = farol([vMes, vA, vB], p.direcao, p.estado);
+
+  const linhas = [
+    linhaAnalise(p.incidenciaRotulo, null, null,
+      vazio(p.incidencia) ? undefined : N2.format(p.incidencia) + "%"),
+    linhaAnalise(p.mesAntRotulo || "Mês anterior", p.mesAnt, vMes),
+    linhaAnalise("Média/mês " + ANO, p.mediaAtual, vA),
+    linhaAnalise("Média/mês " + (ANO - 1), p.mediaAnt, vB),
+  ].join("");
+
+  return `<article class="cartao sem-grafico" data-s="${estado}">
+    <div class="cartao-topo"><h3>${p.titulo}</h3><span class="chip" data-s="${estado}">${ROTULO[estado]}</span></div>
+    <div class="heroi">
+      <span class="grande">${N0.format(p.valor)}</span>
+      <span class="lado">${N1.format(p.pct)}%<span>${p.pctRotulo}</span></span>
+    </div>
+    <dl class="analises">${linhas}</dl>
+  </article>`;
+}
+
+function cartaoMotivos(m) {
+  const colunas = m.familias.map((f) => {
+    const itens = f.itens.map((it) => {
+      const pct = f.total ? (it.qtd / f.total) * 100 : 0;
+      const cor = pct >= 60 ? "var(--cri-marca)" : "var(--verde-claro)";
+      return `<li><span class="nome">${it.motivo}</span><span class="val">${N0.format(it.qtd)}</span>
+        <span class="barra" style="--cor:${cor}"><i style="width:${pct.toFixed(0)}%"></i></span></li>`;
+    }).join("");
+    return `<div><span class="mini">${f.nome} · ${N0.format(f.total)}</span><ol class="rank">${itens}</ol></div>`;
+  }).join("");
+
+  return `<article class="cartao sem-grafico" data-s="${m.estado}">
+    <div class="cartao-topo"><h3>Motivos de saída</h3><span class="chip" data-s="${m.estado}">${m.chip}</span></div>
+    <div class="duplo">${colunas}</div>
+    <p class="nota" contenteditable="true" data-campo="motivos.nota">${m.nota}</p>
+  </article>`;
+}
+
+function cartaoDiretorias(d) {
+  const linhas = d.linhas.map((l) => `<tr>
+    <td>${l.sigla}</td><td>${N0.format(l.vol)}</td><td>${N0.format(l.inv)}</td>
+    <td class="forte">${N0.format(l.total)}</td><td>${N1.format(l.pct)}%</td>
+    <td>${vazio(l.taxa) ? (faltantes++, '<span class="falta">—</span>') : N2.format(l.taxa) + "%"}</td>
+    <td>${vazio(l.indice) ? (faltantes++, '<span class="falta">—</span>') : N2.format(l.indice) + "×"}</td>
+  </tr>`).join("");
+
+  return `<article class="cartao sem-grafico" data-s="${d.estado}">
+    <div class="cartao-topo"><h3>Diretorias</h3><span class="chip" data-s="${d.estado}">${d.chip}</span></div>
+    <table class="dir">
+      <thead><tr><th>Diretoria</th><th>Vol.</th><th>Inv.</th><th>Total</th><th>% saídas</th><th>Taxa</th><th>Índice</th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>
+    <p class="nota" contenteditable="true" data-campo="diretorias.nota">${d.nota}</p>
+  </article>`;
+}
+
+/* ==========================================================================
+   5. Render
+   ========================================================================== */
+let DADOS = JSON.parse(document.getElementById("dados").textContent);
+let ANO = 2026;
+
+function render() {
+  faltantes = 0;
+  ANO = Number(String(DADOS.meta.periodo).match(/\d{4}/)?.[0]) || new Date().getFullYear();
+
+  document.getElementById("titulo").textContent = DADOS.meta.titulo;
+  document.getElementById("subtitulo").textContent =
+    `${DADOS.meta.periodo} · fechado até a semana ${DADOS.meta.semana} · ${DADOS.meta.recorte}`;
+  document.getElementById("regua").textContent = DADOS.meta.regua || "";
+
+  const logo = document.getElementById("logo"), vazioLogo = document.getElementById("logo-vazio");
+  if (DADOS.meta.logo) { logo.src = DADOS.meta.logo; logo.hidden = false; vazioLogo.hidden = true; }
+  else { logo.hidden = true; vazioLogo.hidden = false; }
+
+  document.getElementById("linha-kpi").innerHTML = DADOS.kpis.map(cartaoKpi).join("");
+  document.getElementById("linha-perfil").innerHTML =
+    DADOS.perfil.map(cartaoPerfil).join("") + cartaoMotivos(DADOS.motivos) + cartaoDiretorias(DADOS.diretorias);
+  document.getElementById("insight").innerHTML = DADOS.insight;
+
+  const selo = document.getElementById("selo-falta");
+  selo.hidden = faltantes === 0;
+  selo.textContent = `${faltantes} ${faltantes === 1 ? "campo aguardando dado" : "campos aguardando dado"}`;
+
+  ligarEdicao();
+}
+
+/* textos editáveis gravam de volta no objeto de dados */
+function ligarEdicao() {
+  document.querySelectorAll('[contenteditable="true"]').forEach((el) => {
+    if (el.dataset.ligado) return;
+    el.dataset.ligado = "1";
+    el.addEventListener("blur", () => {
+      const campo = el.dataset.campo;
+      if (!campo) { DADOS.insight = el.innerHTML; return; }
+      const [a, b] = campo.split(".");
+      DADOS[a][b] = el.innerHTML;
+    });
+  });
+}
+
+/* ==========================================================================
+   6. Leitura do Excel colado
+   ========================================================================== */
+/**
+ * Número vindo do Excel. Aceita 1.234,5 (pt-BR) e 1234.5 (en-US):
+ * com vírgula, o ponto é milhar; sem vírgula, o ponto só é milhar quando
+ * separa exatamente três dígitos — assim "1.70" continua valendo 1,70.
+ */
+const n = (s) => {
+  if (s === undefined || s === null) return null;
+  const t = String(s).trim();
+  if (!t || t === "-" || t === "—") return null;
+  const limpo = t.includes(",")
+    ? t.replace(/\./g, "").replace(",", ".")
+    : t.replace(/\.(?=\d{3}\b)/g, "");
+  const v = Number(limpo);
+  return Number.isFinite(v) ? v : null;
+};
+const t = (s) => (s === undefined || s === null ? "" : String(s).trim());
+
+/** Quebra a colagem em seções marcadas por #NOME na primeira coluna. */
+function seccionar(texto) {
+  const secoes = {};
+  let atual = null;
+  for (const linha of texto.split(/\r?\n/)) {
+    const cel = linha.split("\t");
+    const primeira = t(cel[0]);
+    if (primeira.startsWith("#")) { atual = primeira.slice(1).toUpperCase(); secoes[atual] = []; continue; }
+    if (!atual) continue;
+    if (cel.every((c) => !t(c))) continue;
+    secoes[atual].push(cel);
+  }
+  return secoes;
+}
+
+/** Converte linhas com cabeçalho em objetos. */
+function tabela(linhas) {
+  if (!linhas || linhas.length < 2) return [];
+  const cab = linhas[0].map((c) => t(c).toLowerCase());
+  return linhas.slice(1).map((l) => Object.fromEntries(cab.map((c, i) => [c, t(l[i])])));
+}
+
+function interpretar(texto) {
+  const s = seccionar(texto);
+  if (!s.META && !s.KPI) throw new Error("Não encontrei as seções #META e #KPI. Copiou a aba Dados inteira?");
+
+  const meta = Object.fromEntries((s.META || []).map((l) => [t(l[0]).toLowerCase(), t(l[1])]));
+  const series = {};
+  for (const l of tabela(s.SERIE)) {
+    const id = l.id;
+    if (!id) continue;
+    series[id] = Object.entries(l).filter(([k]) => k !== "id").map(([, v]) => n(v)).filter((v) => v !== null);
+  }
+
+  const novo = {
+    meta: {
+      titulo: meta.titulo || DADOS.meta.titulo,
+      periodo: meta.periodo || DADOS.meta.periodo,
+      semana: meta.semana || DADOS.meta.semana,
+      recorte: meta.recorte || DADOS.meta.recorte,
+      regua: meta.regua || "",
+      logo: DADOS.meta.logo || "",
+    },
+    kpis: tabela(s.KPI).map((r) => ({
+      id: r.id, titulo: r.titulo, taxa: n(r.taxa), qtd: n(r.qtd), unidade: r.unidade,
+      semQtd: n(r.sem_qtd), semTaxa: n(r.sem_taxa),
+      mesAntRotulo: r.mes_ant_rotulo || "Mês anterior", mesAnt: n(r.mes_ant),
+      mediaAtual: n(r.media_atual), mediaAnt: n(r.media_ant),
+      direcao: r.direcao, estado: r.estado || "auto", serie: series[r.id] || [],
+    })),
+    perfil: tabela(s.PERFIL).map((r) => ({
+      id: r.id, titulo: r.titulo, valor: n(r.valor), pct: n(r.pct), pctRotulo: r.pct_rotulo || "das saídas",
+      incidenciaRotulo: r.incidencia_rotulo || "Taxa de incidência", incidencia: n(r.incidencia),
+      mesAntRotulo: r.mes_ant_rotulo || "Mês anterior", mesAnt: n(r.mes_ant),
+      mediaAtual: n(r.media_atual), mediaAnt: n(r.media_ant),
+      direcao: r.direcao, estado: r.estado || "auto",
+    })),
+    motivos: { estado: "atencao", chip: "Codificação frágil", familias: [], nota: DADOS.motivos.nota },
+    diretorias: { estado: "nd", chip: "Por volume", linhas: [], nota: DADOS.diretorias.nota },
+    insight: DADOS.insight,
+  };
+
+  const porFamilia = new Map();
+  for (const r of tabela(s.MOTIVOS)) {
+    if (!r.familia || !r.motivo) continue;
+    if (!porFamilia.has(r.familia)) porFamilia.set(r.familia, []);
+    porFamilia.get(r.familia).push({ motivo: r.motivo, qtd: n(r.qtd) || 0 });
+  }
+  novo.motivos.familias = [...porFamilia].map(([nome, itens]) => ({
+    nome, total: itens.reduce((a, b) => a + b.qtd, 0), itens: itens.slice(0, 3),
+  }));
+
+  novo.diretorias.linhas = tabela(s.DIRETORIAS)
+    .filter((r) => r.sigla)
+    .slice(0, 3)
+    .map((r) => ({ sigla: r.sigla, vol: n(r.vol) || 0, inv: n(r.inv) || 0, total: n(r.total) || 0, pct: n(r.pct) || 0, taxa: n(r.taxa), indice: n(r.indice) }));
+
+  const textos = Object.fromEntries((s.TEXTO || []).map((l) => [t(l[0]).toLowerCase(), t(l[1])]));
+  if (textos.insight) novo.insight = textos.insight;
+  if (textos.nota_motivos) novo.motivos.nota = textos.nota_motivos;
+  if (textos.nota_diretorias) novo.diretorias.nota = textos.nota_diretorias;
+
+  if (!novo.kpis.length) throw new Error("A seção #KPI veio sem linhas de dado.");
+  return novo;
+}
+
+/* ==========================================================================
+   7. Barra de ferramentas
+   ========================================================================== */
+const painel = document.getElementById("painel-dados");
+const aviso = document.getElementById("aviso");
+
+document.getElementById("btn-dados").addEventListener("click", (e) => {
+  painel.hidden = !painel.hidden;
+  e.currentTarget.setAttribute("aria-expanded", String(!painel.hidden));
+  if (!painel.hidden) document.getElementById("colagem").focus();
+});
+
+document.getElementById("btn-aplicar").addEventListener("click", () => {
+  const texto = document.getElementById("colagem").value;
+  if (!texto.trim()) { aviso.dataset.t = "erro"; aviso.textContent = "Cole os dados antes de aplicar."; return; }
+  try {
+    DADOS = interpretar(texto);
+    render();
+    aviso.dataset.t = "ok";
+    aviso.textContent = `Aplicado: ${DADOS.kpis.length} indicadores, ${DADOS.perfil.length} recortes.`;
+  } catch (err) {
+    aviso.dataset.t = "erro";
+    aviso.textContent = err.message;
+  }
+});
+
+document.getElementById("btn-exemplo").addEventListener("click", () => {
+  document.getElementById("colagem").value = EXEMPLO;
+  aviso.dataset.t = "ok";
+  aviso.textContent = "Formato de exemplo carregado — clique em Aplicar para ver.";
+});
+
+document.getElementById("arq-logo").addEventListener("change", (e) => {
+  const arq = e.target.files && e.target.files[0];
+  if (!arq) return;
+  const leitor = new FileReader();
+  leitor.onload = () => { DADOS.meta.logo = leitor.result; render(); };
+  leitor.readAsDataURL(arq);
+});
+
+document.getElementById("btn-imprimir").addEventListener("click", () => window.print());
+
+/** Salva um HTML autossuficiente com os dados e comentários já embutidos. */
+document.getElementById("btn-salvar").addEventListener("click", () => {
+  const clone = document.documentElement.cloneNode(true);
+  const bloco = clone.querySelector("#dados");
+  bloco.textContent = JSON.stringify(DADOS, null, 1);
+  clone.querySelector("#painel-dados").setAttribute("hidden", "");
+  const area = clone.querySelector("#colagem");
+  if (area) area.textContent = "";
+  const html = "<!doctype html>\n" + clone.outerHTML;
+
+  const nome = `movimentacoes-${String(DADOS.meta.periodo).replace(/\s+/g, "-").toLowerCase()}-S${DADOS.meta.semana}.html`;
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = nome; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+});
+
+/* formato de exemplo, igual ao da aba Dados do modelo-semanal.xlsx */
+const EXEMPLO = [
+  "#META", "titulo\tMovimentações", "periodo\tJulho 2026", "semana\t30",
+  "recorte\tConsolidado — todas as empresas", "regua\tMTD com 4 de 4,4 semanas", "",
+  "#KPI",
+  "id\ttitulo\ttaxa\tqtd\tunidade\tsem_qtd\tsem_taxa\tmes_ant_rotulo\tmes_ant\tmedia_atual\tmedia_ant\tdirecao\testado",
+  "turnover\tTurnover geral\t1,70\t91\tsaídas\t19\t0,36\tJunho\t123\t119\t105\tmenor\tauto",
+  "voluntario\tVoluntários\t0,92\t49\tsaídas\t7\t0,13\tJunho\t78\t75,3\t74,6\tmenor\tauto",
+  "involuntario\tInvoluntários\t0,79\t42\tsaídas\t12\t0,22\tJunho\t45\t43,5\t32,7\tmenor\tauto",
+  "admitidos\tAdmitidos\t1,46\t78\tentradas\t\t\tJunho\t85\t\t\t\tauto", "",
+  "#SERIE",
+  "id\tjan\tfev\tmar\tabr\tmai\tjun\tjul",
+  "turnover\t93\t147\t116\t119\t115\t123\t91",
+  "voluntario\t69\t63\t82\t82\t78\t78\t49",
+  "involuntario\t24\t84\t34\t37\t37\t45\t42", "",
+  "#PERFIL",
+  "id\ttitulo\tvalor\tpct\tpct_rotulo\tincidencia_rotulo\tincidencia\tmes_ant_rotulo\tmes_ant\tmedia_atual\tmedia_ant\tdirecao\testado",
+  "lideres\tLíderes desligados\t9\t9,9\tdas saídas\tTaxa sobre líderes\t\tJunho\t4\t\t\tmenor\tauto",
+  "ate1ano\tAté 1 ano\t32\t35,2\tdas saídas\tTaxa de incidência\t\tJunho\t\t\t\tmenor\tauto", "",
+  "#MOTIVOS",
+  "familia\tmotivo\tqtd",
+  "Voluntário\tParticular\t40", "Voluntário\tProposta externa\t4", "Voluntário\tMudança de cidade\t2",
+  "Involuntário\tPerformance\t16", "Involuntário\tCultura organizacional\t7", "Involuntário\tRedução de quadro\t7", "",
+  "#DIRETORIAS",
+  "sigla\tvol\tinv\ttotal\tpct\ttaxa\tindice",
+  "FLO\t32\t29\t61\t67,0\t\t", "IND\t6\t6\t12\t13,2\t\t", "TRP\t6\t1\t7\t7,7\t\t", "",
+  "#TEXTO",
+  "insight\tJulho: volume desacelera 26% vs junho, puxado pelo voluntário.",
+].join("\n");
+
+render();
+</script>
+</body>
+</html>
