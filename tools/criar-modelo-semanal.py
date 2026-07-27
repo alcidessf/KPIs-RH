@@ -117,6 +117,7 @@ for chave, valor in [
     ("periodo", "Julho 2026"),
     ("semana", 30),
     ("recorte", "Consolidado — todas as empresas"),
+    ("janela", "Mês (MTD)"),
     ("regua", "MTD com 4 de 4,4 semanas"),
 ]:
     dados([chave, valor])
@@ -176,12 +177,12 @@ branco()
 # --- TEXTO --------------------------------------------------------
 secao("TEXTO")
 for chave, valor in [
-    ("insight", "Julho: volume desacelera 26% vs junho, puxado pelo voluntário (−37%). "
-                "Atenção no involuntário — igual à média de 2026, mas +28% acima da média de 2025. "
-                "Alerta nos líderes: 9 saídas contra 4 em junho."),
-    ("nota_motivos", "“Particular” = 82% dos pedidos de demissão. O motivo mais frequente é "
+    ("insight", "**Julho:** volume desacelera 26% vs junho, puxado pelo voluntário (−37%). "
+                "**Atenção no involuntário** — igual à média de 2026, mas **+28% acima da média de 2025**. "
+                "**Alerta nos líderes:** 9 saídas contra 4 em junho."),
+    ("nota_motivos", "**“Particular” = 82% dos pedidos de demissão.** O motivo mais frequente é "
                      "“não sabemos”: achado de codificação, não de visualização."),
-    ("nota_diretorias", "Ranking de tamanho, não de risco. Falta headcount por diretoria para "
+    ("nota_diretorias", "**Ranking de tamanho, não de risco.** Falta headcount por diretoria para "
                         "calcular taxa e índice de sobre-representação."),
 ]:
     dados([chave, valor])
@@ -287,6 +288,8 @@ blocos = [
                     "em Salvar semana e coloque o arquivo gerado na pasta de rede. Cada semana vira um "
                     "arquivo próprio — vale como registro do que foi apresentado e comentado."),
     ("Como preencher os campos", None),
+    ("Negrito nos textos", "Escreva **assim** para deixar em negrito no painel. Vale no insight e nas duas "
+                        "notas."),
     ("Célula em branco", "Deixe vazia quando o dado não existir. A tela mostra “sem dado” em cinza e "
                          "conta no selo do topo. Nunca preencha com zero para tapar buraco: zero é uma "
                          "afirmação, vazio é a verdade."),
@@ -301,7 +304,9 @@ blocos = [
     ("SERIE", "Uma linha por indicador, um mês por coluna, na ordem. Meses ainda não fechados ficam "
               "em branco — a linha de tendência simplesmente para ali."),
     ("MOTIVOS", "O painel mostra os três primeiros de cada família. Separe voluntário de involuntário: "
-                "“por que nos deixam” e “por que desligamos” são conversas diferentes."),
+                "“por que nos deixam” e “por que desligamos” são conversas diferentes. O percentual de "
+                "cada motivo é calculado sobre o total de desligamentos daquele tipo (vem do bloco KPI), "
+                "não sobre a soma dos três."),
     ("DIRETORIAS", "taxa e indice ficam em branco enquanto não houver headcount por diretoria. Sem "
                    "eles o ranking é de tamanho, não de risco — a tela avisa isso sozinha."),
     ("A logo", None),

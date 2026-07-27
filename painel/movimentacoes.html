@@ -131,16 +131,14 @@ ol { list-style: none; }
   background: var(--cartao); border: 1px solid var(--fio); border-radius: 0.5cqw;
   padding: 0.45cqw 0.7cqw;
 }
-.filtro {
-  display: inline-flex; align-items: center; gap: 0.35cqw;
+/* Tira de contexto, não filtro. O painel mostra um recorte por arquivo, então
+   estes rótulos declaram qual é — sem fingir que se pode clicar neles. */
+.contexto {
+  display: inline-flex; align-items: baseline; gap: 0.3cqw;
   font-size: 0.72cqw; color: var(--tinta-3); white-space: nowrap;
-  padding: 0.3cqw 0.6cqw; border: 1px solid var(--fio); border-radius: 0.35cqw;
 }
-.filtro b { color: var(--tinta-2); font-weight: 600; }
-.filtro::after { content: "▾"; font-size: 0.55cqw; }
-.janela { display: flex; gap: 0.1cqw; padding: 0.12cqw; background: var(--papel); border: 1px solid var(--fio); border-radius: 0.4cqw; }
-.janela span { padding: 0.28cqw 0.75cqw; border-radius: 0.3cqw; font-size: 0.72cqw; font-weight: 600; color: var(--tinta-3); }
-.janela span[data-on] { background: var(--verde); color: #fff; }
+.contexto b { color: var(--tinta-2); font-weight: 600; }
+.contexto + .contexto { padding-left: 0.6cqw; border-left: 1px solid var(--fio); }
 .regua { margin-left: auto; font-size: 0.72cqw; color: var(--tinta-3); white-space: nowrap; }
 
 /* --- grade --- */
@@ -256,9 +254,8 @@ table.dir td.forte { color: var(--tinta); font-weight: 700; }
   .logo, .logo-vazio { height: 28px; width: auto; }
   .logo-vazio { width: 74px; font-size: 8px; }
   .filtros { flex-wrap: wrap; padding: 8px; border-radius: 8px; }
-  .filtro, .janela span, .regua { font-size: 12px; }
-  .filtro { padding: 5px 9px; border-radius: 6px; }
-  .janela span { padding: 5px 11px; border-radius: 6px; }
+  .contexto, .regua { font-size: 12px; }
+  .contexto + .contexto { padding-left: 8px; }
   .linha { gap: 10px; }
   .linha-a, .linha-b { flex: none; }
   .analises { flex: none; grid-auto-rows: auto; }
@@ -302,11 +299,17 @@ table.dir td.forte { color: var(--tinta); font-weight: 700; }
 </div>
 
 <section class="painel-dados" id="painel-dados" hidden>
-  <h2>Colar os dados da semana</h2>
+  <h2>Carregar os dados da semana</h2>
   <p>
-    Abra <b>modelo-semanal.xlsx</b>, selecione tudo na aba <b>Dados</b> (Ctrl+A), copie (Ctrl+C) e cole aqui.
-    A tela é redesenhada na hora. Depois use <b>Salvar semana</b> para gerar o arquivo que vai para a pasta de rede.
+    <b>Caminho curto:</b> clique em <b>Escolher arquivo</b> e aponte para <b>modelo-semanal.xlsx</b> — o painel lê a aba
+    <b>Dados</b> sozinho.<br>
+    <b>Alternativa:</b> abrir a planilha, selecionar tudo na aba Dados (Ctrl+A), copiar (Ctrl+C) e colar na caixa abaixo.<br>
+    Depois use <b>Salvar semana</b> para gerar o arquivo que vai para a pasta de rede.
   </p>
+  <div class="painel-acoes" style="margin: 0 0 10px">
+    <label class="btn primario" for="arq-dados">Escolher arquivo (.xlsx, .csv, .txt)</label>
+    <input type="file" id="arq-dados" accept=".xlsx,.csv,.tsv,.txt" hidden>
+  </div>
   <textarea id="colagem" spellcheck="false" aria-label="Área para colar os dados vindos do Excel"
             placeholder="Cole aqui o conteúdo copiado do Excel…"></textarea>
   <div class="painel-acoes">
@@ -331,10 +334,8 @@ table.dir td.forte { color: var(--tinta); font-weight: 700; }
   </header>
 
   <div class="filtros">
-    <span class="filtro">Empresa: <b id="f-empresa">Todas</b></span>
-    <span class="filtro">Diretoria: <b id="f-diretoria">Todas</b></span>
-    <span class="filtro">Área: <b id="f-area">Todas</b></span>
-    <div class="janela"><span>Semana</span><span data-on>Mês</span><span>Ano</span></div>
+    <span class="contexto">Recorte: <b id="c-recorte"></b></span>
+    <span class="contexto">Janela: <b id="c-janela"></b></span>
     <span class="regua" id="regua"></span>
   </div>
 
@@ -354,6 +355,7 @@ table.dir td.forte { color: var(--tinta); font-weight: 700; }
   "periodo": "Julho 2026",
   "semana": "30",
   "recorte": "Consolidado — todas as empresas",
+  "janela": "Mês (MTD)",
   "regua": "MTD com 4 de 4,4 semanas",
   "logo": ""
  },
@@ -393,7 +395,7 @@ table.dir td.forte { color: var(--tinta); font-weight: 700; }
    { "nome": "Involuntário", "total": 42, "itens": [
      { "motivo": "Performance", "qtd": 16 }, { "motivo": "Cultura organizacional", "qtd": 7 }, { "motivo": "Redução de quadro", "qtd": 7 } ] }
   ],
-  "nota": "<b>“Particular” = 82% dos pedidos de demissão.</b> O motivo mais frequente é “não sabemos”: achado de codificação, não de visualização."
+  "nota": "**“Particular” = 82% dos pedidos de demissão.** O motivo mais frequente é “não sabemos”: achado de codificação, não de visualização."
  },
  "diretorias": {
   "estado": "nd", "chip": "Por volume",
@@ -402,9 +404,9 @@ table.dir td.forte { color: var(--tinta); font-weight: 700; }
    { "sigla": "IND", "vol": 6, "inv": 6, "total": 12, "pct": 13.2, "taxa": null, "indice": null },
    { "sigla": "TRP", "vol": 6, "inv": 1, "total": 7, "pct": 7.7, "taxa": null, "indice": null }
   ],
-  "nota": "<b>Ranking de tamanho, não de risco.</b> Falta headcount por diretoria para calcular taxa e índice de sobre-representação."
+  "nota": "**Ranking de tamanho, não de risco.** Falta headcount por diretoria para calcular taxa e índice de sobre-representação."
  },
- "insight": "<strong>Julho:</strong> volume desacelera 26% vs junho, puxado pelo voluntário (−37%). <strong>Atenção no involuntário</strong> — igual à média de 2026, mas <strong>+28% acima da média de 2025</strong>: a régua muda o sinal. <strong>Alerta nos líderes:</strong> 9 saídas contra 4 em junho, e sem o total de líderes não dá para dizer se 9 é muito."
+ "insight": "**Julho:** volume desacelera 26% vs junho, puxado pelo voluntário (−37%). **Atenção no involuntário** — igual à média de 2026, mas **+28% acima da média de 2025**: a régua muda o sinal. **Alerta nos líderes:** 9 saídas contra 4 em junho, e sem o total de líderes não dá para dizer se 9 é muito."
 }
 </script>
 
@@ -422,6 +424,16 @@ const vazio = (v) => v === null || v === undefined || v === "";
 function num(v) {
   if (vazio(v)) return null;
   return Number.isInteger(v) ? N0.format(v) : N1.format(v);
+}
+
+/**
+ * Texto vindo da planilha. Escapa HTML e depois converte **assim** em negrito —
+ * a planilha carrega ênfase sem carregar marcação.
+ */
+function textoRico(s) {
+  return String(s == null ? "" : s)
+    .replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 }
 
 /* ==========================================================================
@@ -580,7 +592,7 @@ function cartaoMotivos(m) {
   return `<article class="cartao sem-grafico" data-s="${m.estado}">
     <div class="cartao-topo"><h3>Motivos de saída</h3><span class="chip" data-s="${m.estado}">${m.chip}</span></div>
     <div class="duplo">${colunas}</div>
-    <p class="nota" contenteditable="true" data-campo="motivos.nota">${m.nota}</p>
+    <p class="nota" contenteditable="true" data-campo="motivos.nota">${textoRico(m.nota)}</p>
   </article>`;
 }
 
@@ -598,7 +610,7 @@ function cartaoDiretorias(d) {
       <thead><tr><th>Diretoria</th><th>Vol.</th><th>Inv.</th><th>Total</th><th>% saídas</th><th>Taxa</th><th>Índice</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
-    <p class="nota" contenteditable="true" data-campo="diretorias.nota">${d.nota}</p>
+    <p class="nota" contenteditable="true" data-campo="diretorias.nota">${textoRico(d.nota)}</p>
   </article>`;
 }
 
@@ -614,7 +626,9 @@ function render() {
 
   document.getElementById("titulo").textContent = DADOS.meta.titulo;
   document.getElementById("subtitulo").textContent =
-    `${DADOS.meta.periodo} · fechado até a semana ${DADOS.meta.semana} · ${DADOS.meta.recorte}`;
+    `${DADOS.meta.periodo} · fechado até a semana ${DADOS.meta.semana}`;
+  document.getElementById("c-recorte").textContent = DADOS.meta.recorte;
+  document.getElementById("c-janela").textContent = DADOS.meta.janela || "Mês (MTD)";
   document.getElementById("regua").textContent = DADOS.meta.regua || "";
 
   const logo = document.getElementById("logo"), vazioLogo = document.getElementById("logo-vazio");
@@ -624,7 +638,7 @@ function render() {
   document.getElementById("linha-kpi").innerHTML = DADOS.kpis.map(cartaoKpi).join("");
   document.getElementById("linha-perfil").innerHTML =
     DADOS.perfil.map(cartaoPerfil).join("") + cartaoMotivos(DADOS.motivos) + cartaoDiretorias(DADOS.diretorias);
-  document.getElementById("insight").innerHTML = DADOS.insight;
+  document.getElementById("insight").innerHTML = textoRico(DADOS.insight);
 
   const selo = document.getElementById("selo-falta");
   selo.hidden = faltantes === 0;
@@ -639,10 +653,15 @@ function ligarEdicao() {
     if (el.dataset.ligado) return;
     el.dataset.ligado = "1";
     el.addEventListener("blur", () => {
+      // volta como texto com **negrito**, no mesmo formato que a planilha usa
+      const texto = el.innerHTML
+        .replace(/<\/?(b|strong)>/gi, "**")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
       const campo = el.dataset.campo;
-      if (!campo) { DADOS.insight = el.innerHTML; return; }
+      if (!campo) { DADOS.insight = texto; return; }
       const [a, b] = campo.split(".");
-      DADOS[a][b] = el.innerHTML;
+      DADOS[a][b] = texto;
     });
   });
 }
@@ -707,6 +726,7 @@ function interpretar(texto) {
       periodo: meta.periodo || DADOS.meta.periodo,
       semana: meta.semana || DADOS.meta.semana,
       recorte: meta.recorte || DADOS.meta.recorte,
+      janela: meta.janela || DADOS.meta.janela || "Mês (MTD)",
       regua: meta.regua || "",
       logo: DADOS.meta.logo || "",
     },
@@ -735,9 +755,15 @@ function interpretar(texto) {
     if (!porFamilia.has(r.familia)) porFamilia.set(r.familia, []);
     porFamilia.get(r.familia).push({ motivo: r.motivo, qtd: n(r.qtd) || 0 });
   }
-  novo.motivos.familias = [...porFamilia].map(([nome, itens]) => ({
-    nome, total: itens.reduce((a, b) => a + b.qtd, 0), itens: itens.slice(0, 3),
-  }));
+  /* O total da família é o total de desligamentos daquele tipo, tirado do KPI —
+     nunca a soma do top 3, que cobre só parte das saídas. É o que faz o
+     percentual de cada motivo ser sobre o universo certo. */
+  const semAcento = (x) => String(x).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  novo.motivos.familias = [...porFamilia].map(([nome, itens]) => {
+    const kpi = novo.kpis.find((k) => semAcento(k.id) === semAcento(nome) || semAcento(k.titulo) === semAcento(nome));
+    const total = kpi && !vazio(kpi.qtd) ? kpi.qtd : itens.reduce((a, b) => a + b.qtd, 0);
+    return { nome, total, itens: itens.slice(0, 3) };
+  });
 
   novo.diretorias.linhas = tabela(s.DIRETORIAS)
     .filter((r) => r.sigla)
@@ -754,6 +780,132 @@ function interpretar(texto) {
 }
 
 /* ==========================================================================
+   6b. Leitura direta do .xlsx
+   --------------------------------------------------------------------------
+   Um .xlsx é um ZIP de XMLs. Aqui ele é aberto na unha — índice central do ZIP,
+   inflate pelo DecompressionStream do próprio navegador, e DOMParser no XML.
+   Nenhuma biblioteca externa, porque o arquivo tem de rodar de pasta de rede
+   sem buscar nada fora.
+   ========================================================================== */
+
+async function inflar(bytes, metodo) {
+  if (metodo === 0) return bytes;                       // guardado sem compressão
+  if (metodo !== 8) throw new Error("Compressão do .xlsx não suportada (método " + metodo + ").");
+  if (typeof DecompressionStream === "undefined") {
+    throw new Error("Este navegador não descompacta .xlsx. Use a colagem do Excel.");
+  }
+  const fluxo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(fluxo).arrayBuffer());
+}
+
+/** Lê o índice central do ZIP e devolve o mapa nome -> posição. */
+function abrirZip(buffer) {
+  const dv = new DataView(buffer);
+  const u8 = new Uint8Array(buffer);
+  let eocd = -1;
+  const limite = Math.max(0, buffer.byteLength - 65558);
+  for (let i = buffer.byteLength - 22; i >= limite; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Não parece um .xlsx válido (índice do ZIP não encontrado).");
+
+  const total = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const entradas = new Map();
+  const td = new TextDecoder();
+  for (let i = 0; i < total; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const metodo = dv.getUint16(p + 10, true);
+    const tamanho = dv.getUint32(p + 20, true);
+    const nomeLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const comentLen = dv.getUint16(p + 32, true);
+    const offset = dv.getUint32(p + 42, true);
+    entradas.set(td.decode(u8.subarray(p + 46, p + 46 + nomeLen)), { metodo, tamanho, offset });
+    p += 46 + nomeLen + extraLen + comentLen;
+  }
+  return { dv, u8, entradas };
+}
+
+async function lerDoZip(zip, nome) {
+  const e = zip.entradas.get(nome);
+  if (!e) return null;
+  if (zip.dv.getUint32(e.offset, true) !== 0x04034b50) throw new Error("ZIP corrompido em " + nome);
+  const nomeLen = zip.dv.getUint16(e.offset + 26, true);
+  const extraLen = zip.dv.getUint16(e.offset + 28, true);
+  const inicio = e.offset + 30 + nomeLen + extraLen;
+  return new TextDecoder().decode(await inflar(zip.u8.subarray(inicio, inicio + e.tamanho), e.metodo));
+}
+
+/** "A" -> 0, "B" -> 1, "AA" -> 26 */
+function indiceColuna(letras) {
+  let n = 0;
+  for (const c of letras) n = n * 26 + (c.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+/** Converte a aba pedida do .xlsx no mesmo texto tabulado que a colagem produz. */
+async function xlsxParaTexto(buffer, nomeAba) {
+  const zip = abrirZip(buffer);
+  const xml = new DOMParser();
+  const NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+  const wb = xml.parseFromString(await lerDoZip(zip, "xl/workbook.xml"), "application/xml");
+  const rels = xml.parseFromString(await lerDoZip(zip, "xl/_rels/workbook.xml.rels"), "application/xml");
+  const alvos = {};
+  for (const r of rels.getElementsByTagName("Relationship")) alvos[r.getAttribute("Id")] = r.getAttribute("Target");
+
+  let caminho = null, disponiveis = [];
+  for (const aba of wb.getElementsByTagName("sheet")) {
+    const nome = aba.getAttribute("name");
+    disponiveis.push(nome);
+    const rid = aba.getAttributeNS(NS_R, "id") || aba.getAttribute("r:id");
+    if (nome.toLowerCase() === nomeAba.toLowerCase()) caminho = alvos[rid];
+  }
+  if (!caminho) throw new Error(`A aba "${nomeAba}" não existe. Abas do arquivo: ${disponiveis.join(", ")}.`);
+  caminho = caminho.replace(/^\/?xl\//, "").replace(/^\//, "");
+
+  // textos compartilhados: o Excel usa isto ao salvar; o openpyxl usa inlineStr
+  const compartilhados = [];
+  const ssXml = await lerDoZip(zip, "xl/sharedStrings.xml");
+  if (ssXml) {
+    for (const si of xml.parseFromString(ssXml, "application/xml").getElementsByTagName("si")) {
+      let texto = "";
+      for (const t of si.getElementsByTagName("t")) texto += t.textContent;
+      compartilhados.push(texto);
+    }
+  }
+
+  const doc = xml.parseFromString(await lerDoZip(zip, "xl/" + caminho), "application/xml");
+  const linhas = new Map();
+  let ultima = 0;
+  for (const tr of doc.getElementsByTagName("row")) {
+    const iLinha = Number(tr.getAttribute("r") || 0) - 1;
+    const celulas = [];
+    for (const c of tr.getElementsByTagName("c")) {
+      const ref = (c.getAttribute("r") || "").replace(/\d+/g, "");
+      const iCol = ref ? indiceColuna(ref) : celulas.length;
+      const tipo = c.getAttribute("t");
+      const v = c.getElementsByTagName("v")[0];
+      let valor = "";
+      if (tipo === "s") valor = v ? (compartilhados[Number(v.textContent)] ?? "") : "";
+      else if (tipo === "inlineStr") { const t = c.getElementsByTagName("t")[0]; valor = t ? t.textContent : ""; }
+      else valor = v ? v.textContent : "";
+      celulas[iCol] = valor;
+    }
+    linhas.set(iLinha, celulas);
+    ultima = Math.max(ultima, iLinha);
+  }
+
+  const saida = [];
+  for (let i = 0; i <= ultima; i++) {
+    const cel = linhas.get(i) || [];
+    saida.push(Array.from(cel, (c) => c ?? "").join("\t"));
+  }
+  return saida.join("\n");
+}
+
+/* ==========================================================================
    7. Barra de ferramentas
    ========================================================================== */
 const painel = document.getElementById("painel-dados");
@@ -767,12 +919,37 @@ document.getElementById("btn-dados").addEventListener("click", (e) => {
 
 document.getElementById("btn-aplicar").addEventListener("click", () => {
   const texto = document.getElementById("colagem").value;
-  if (!texto.trim()) { aviso.dataset.t = "erro"; aviso.textContent = "Cole os dados antes de aplicar."; return; }
+  if (!texto.trim()) { aviso.dataset.t = "erro"; aviso.textContent = "Cole os dados ou escolha o arquivo antes de aplicar."; return; }
+  aplicarTexto(texto, "Aplicado");
+});
+
+/** Aplica um texto tabulado, venha ele da colagem ou do arquivo. */
+function aplicarTexto(texto, origem) {
   try {
     DADOS = interpretar(texto);
     render();
     aviso.dataset.t = "ok";
-    aviso.textContent = `Aplicado: ${DADOS.kpis.length} indicadores, ${DADOS.perfil.length} recortes.`;
+    aviso.textContent = `${origem}: ${DADOS.kpis.length} indicadores, ${DADOS.perfil.length} recortes, ${faltantes} campos sem dado.`;
+    return true;
+  } catch (err) {
+    aviso.dataset.t = "erro";
+    aviso.textContent = err.message;
+    return false;
+  }
+}
+
+document.getElementById("arq-dados").addEventListener("change", async (e) => {
+  const arq = e.target.files && e.target.files[0];
+  e.target.value = "";                       // permite recarregar o mesmo arquivo
+  if (!arq) return;
+  aviso.dataset.t = "ok";
+  aviso.textContent = "Lendo " + arq.name + "…";
+  try {
+    let texto;
+    if (/\.xlsx$/i.test(arq.name)) texto = await xlsxParaTexto(await arq.arrayBuffer(), "Dados");
+    else texto = await arq.text();
+    document.getElementById("colagem").value = texto;
+    aplicarTexto(texto, arq.name);
   } catch (err) {
     aviso.dataset.t = "erro";
     aviso.textContent = err.message;
@@ -815,7 +992,7 @@ document.getElementById("btn-salvar").addEventListener("click", () => {
 /* formato de exemplo, igual ao da aba Dados do modelo-semanal.xlsx */
 const EXEMPLO = [
   "#META", "titulo\tMovimentações", "periodo\tJulho 2026", "semana\t30",
-  "recorte\tConsolidado — todas as empresas", "regua\tMTD com 4 de 4,4 semanas", "",
+  "recorte\tConsolidado — todas as empresas", "janela\tMês (MTD)", "regua\tMTD com 4 de 4,4 semanas", "",
   "#KPI",
   "id\ttitulo\ttaxa\tqtd\tunidade\tsem_qtd\tsem_taxa\tmes_ant_rotulo\tmes_ant\tmedia_atual\tmedia_ant\tdirecao\testado",
   "turnover\tTurnover geral\t1,70\t91\tsaídas\t19\t0,36\tJunho\t123\t119\t105\tmenor\tauto",

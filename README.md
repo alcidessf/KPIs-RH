@@ -94,11 +94,18 @@ atualização sem instalar nada.
 ```
 1. atualizar as células amarelas em modelo-semanal.xlsx (aba Dados)
 2. conferir a aba Conferência — ela acusa soma que não fecha
-3. Ctrl+A e Ctrl+C na aba Dados
-4. abrir o painel, "Atualizar dados", colar, Aplicar
-5. revisar os textos na tela e "Salvar semana"
-6. publicar o arquivo gerado na pasta de rede
+3. abrir o painel, "Atualizar dados", "Escolher arquivo", apontar para o .xlsx
+4. revisar os textos na tela e "Salvar semana"
+5. publicar o arquivo gerado na pasta de rede
 ```
+
+O painel lê o `.xlsx` direto: abre o ZIP e a aba Dados sem biblioteca externa,
+usando o descompactador do próprio navegador. Também aceita `.csv`/`.txt`, ou a
+colagem do Excel (Ctrl+A, Ctrl+C) para quem preferir.
+
+**Não há filtro interativo.** Cada arquivo mostra um recorte, declarado na tira
+de contexto e definido pelo campo `recorte` da planilha. Para ver uma diretoria,
+gere um arquivo com os números dela.
 
 Cada semana vira um arquivo próprio (`movimentacoes-julho-2026-S30.html`), o que
 transforma o histórico em registro do que foi apresentado e comentado.
