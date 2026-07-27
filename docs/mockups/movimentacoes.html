@@ -7,8 +7,10 @@
 <style>
 /* ============================================================
    MODELO VISUAL — estático, para discussão de formato.
-   Tema escuro assumido de propósito: é a referência que o Alcides
-   trouxe, e a tela vive projetada em sala de reunião.
+   Agenda executiva: só o que gera decisão fica na tela.
+
+   Escala tipográfica fechada em cinco tamanhos. Qualquer texto
+   novo tem de usar um deles — é o que segura a tela limpa.
    ============================================================ */
 .tela {
   color-scheme: dark;
@@ -16,227 +18,191 @@
   --pagina:      #0b1220;
   --cartao:      #141d2e;
   --cartao-alto: #1a2438;
-  --fio:         rgba(230, 236, 245, .09);
-  --fio-forte:   rgba(230, 236, 245, .18);
+  --fio:         rgba(230, 236, 245, .08);
+  --fio-forte:   rgba(230, 236, 245, .16);
 
   --tinta:       #e6ecf5;
-  --tinta-2:     #9aa9be;
-  --tinta-3:     #6b7b93;
+  --tinta-2:     #97a6bb;
+  --tinta-3:     #66768e;
 
   --acento:      #3987e5;
 
-  /* status: preenchimento de marca */
   --bom:      #0ca30c;
   --atencao:  #fab219;
   --critico:  #d03b3b;
-  /* status: variantes claras para TEXTO (>= 4.5:1 sobre o cartão) */
   --bom-txt:     #2ec46a;
   --atencao-txt: #fab219;
   --critico-txt: #e66767;
+
+  /* escala tipográfica — cinco tamanhos, e só */
+  --t0: 20px;    /* título da tela */
+  --t1: 32px;    /* número principal */
+  --t2: 14px;    /* título do cartão, unidade, número secundário */
+  --t3: 12px;    /* corpo: rótulos e valores das análises */
+  --t4: 10.5px;  /* micro: chips, legendas, notas */
 
   --raio: 12px;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 
   background: var(--pagina);
   color: var(--tinta);
-  padding: 16px clamp(14px, 2.2vw, 26px) 18px;
+  padding: 18px clamp(16px, 2.2vw, 28px) 20px;
   min-height: 100vh;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
+  display: flex; flex-direction: column; gap: 14px;
 }
 .tela *, .tela *::before, .tela *::after { box-sizing: border-box; }
-.tela h1, .tela h2, .tela h3, .tela p, .tela dl, .tela dd, .tela dt, .tela ol, .tela li { margin: 0; padding: 0; }
+.tela h1, .tela h3, .tela p, .tela dl, .tela dd, .tela dt, .tela ol, .tela li { margin: 0; padding: 0; }
 .tela ol { list-style: none; }
 .num { font-variant-numeric: tabular-nums; }
 
-.olho {
-  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--tinta-3);
-}
-
 /* ---------- cabeçalho ---------- */
-.topo { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
-.topo .titulo { display: flex; align-items: center; gap: 11px; }
-.topo .barra { width: 4px; height: 34px; border-radius: 2px; background: var(--acento); flex: none; }
-.topo h1 { font-size: 21px; font-weight: 700; letter-spacing: -.015em; line-height: 1.1; }
-.topo .sub { font-size: 12px; color: var(--tinta-2); margin-top: 3px; }
-.selos { margin-left: auto; display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+.topo { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.topo .barra { width: 3px; height: 30px; border-radius: 2px; background: var(--acento); flex: none; }
+.topo h1 { font-size: var(--t0); font-weight: 650; letter-spacing: -.02em; line-height: 1.15; }
+.topo .sub { font-size: var(--t3); color: var(--tinta-3); margin-top: 2px; }
 .selo {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 650;
-  border: 1px solid var(--fio-forte); color: var(--tinta-2);
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px; font-size: var(--t4); font-weight: 650;
+  border: 1px solid rgba(250, 178, 25, .4); color: var(--atencao-txt); background: rgba(250, 178, 25, .08);
 }
-.selo.modelo { border-color: rgba(250, 178, 25, .45); color: var(--atencao-txt); background: rgba(250, 178, 25, .09); }
-.selo.falta { border-style: dashed; }
 
-/* ---------- barra de filtros ---------- */
+/* ---------- filtros ---------- */
 .filtros {
   background: var(--cartao); border: 1px solid var(--fio); border-radius: var(--raio);
-  padding: 9px 12px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
 .filtro {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 7px 11px; border-radius: 8px;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 11px; border-radius: 8px;
   background: var(--cartao-alto); border: 1px solid var(--fio);
-  font-size: 12px; color: var(--tinta-2); white-space: nowrap;
+  font-size: var(--t3); color: var(--tinta-3); white-space: nowrap;
 }
-.filtro b { color: var(--tinta); font-weight: 600; }
-.filtro::after { content: "▾"; color: var(--tinta-3); font-size: 10px; }
-.legenda { display: flex; gap: 13px; margin-left: auto; align-items: center; flex-wrap: wrap; }
-.legenda span { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--tinta-2); }
-.pt { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.pt-bom { background: var(--bom); } .pt-atencao { background: var(--atencao); }
-.pt-critico { background: var(--critico); } .pt-nd { background: var(--tinta-3); }
+.filtro b { color: var(--tinta-2); font-weight: 600; }
+.filtro::after { content: "▾"; color: var(--tinta-3); font-size: 9px; }
 .janela { display: flex; gap: 2px; padding: 2px; background: var(--cartao-alto); border-radius: 8px; border: 1px solid var(--fio); }
-.janela span { padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--tinta-2); }
+.janela span { padding: 5px 13px; border-radius: 6px; font-size: var(--t3); font-weight: 600; color: var(--tinta-3); }
 .janela span[data-on] { background: var(--acento); color: #fff; }
+.periodo { margin-left: auto; font-size: var(--t3); color: var(--tinta-3); white-space: nowrap; }
 
 /* ---------- grade ---------- */
-.linha { display: grid; gap: 13px; }
+.linha { display: grid; gap: 14px; }
 .linha-a { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.linha-b { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1.35fr); }
+.linha-b { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.3fr); }
 
 .cartao {
   background: var(--cartao); border: 1px solid var(--fio); border-radius: var(--raio);
-  padding: 15px 16px 16px; position: relative; overflow: hidden;
-  display: flex; flex-direction: column; gap: 9px;
+  padding: 16px 16px 0; position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
 }
-/* faixa de status na borda esquerda: estado legível sem depender só de cor */
 .cartao::before {
-  content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
-  background: var(--faixa, transparent);
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--faixa, transparent);
 }
 .cartao[data-s="bom"]     { --faixa: var(--bom); }
 .cartao[data-s="atencao"] { --faixa: var(--atencao); }
 .cartao[data-s="critico"] { --faixa: var(--critico); }
 .cartao[data-s="nd"]      { --faixa: var(--tinta-3); }
-.cartao.consolidado { background: linear-gradient(180deg, #17233a 0%, var(--cartao) 62%); border-color: rgba(57, 135, 229, .3); }
+.cartao.consolidado { border-color: rgba(57, 135, 229, .28); }
+.cartao.sem-grafico { padding-bottom: 16px; }
 
-.cartao-topo { display: flex; align-items: center; gap: 8px; }
-.cartao h3 { font-size: 14px; font-weight: 650; letter-spacing: -.005em; }
+.cartao-topo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.cartao h3 { font-size: var(--t2); font-weight: 650; letter-spacing: -.005em; }
 .chip {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; white-space: nowrap;
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px; font-size: var(--t4); font-weight: 700; white-space: nowrap;
 }
-.chip[data-s="bom"]     { background: rgba(12, 163, 12, .16);  color: var(--bom-txt); }
-.chip[data-s="atencao"] { background: rgba(250, 178, 25, .15); color: var(--atencao-txt); }
-.chip[data-s="critico"] { background: rgba(208, 59, 59, .18);  color: var(--critico-txt); }
-.chip[data-s="nd"]      { background: rgba(107, 123, 147, .18); color: var(--tinta-2); }
+.chip[data-s="bom"]     { background: rgba(12, 163, 12, .15);  color: var(--bom-txt); }
+.chip[data-s="atencao"] { background: rgba(250, 178, 25, .14); color: var(--atencao-txt); }
+.chip[data-s="critico"] { background: rgba(208, 59, 59, .17);  color: var(--critico-txt); }
+.chip[data-s="nd"]      { background: rgba(102, 118, 142, .18); color: var(--tinta-2); }
 
-/* o número principal: é o foco do cartão */
-.heroi { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.heroi .grande { font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
-.heroi .grande small { font-size: 17px; font-weight: 600; color: var(--tinta-2); margin-left: 1px; }
+/* número principal */
+.heroi { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.heroi .grande { font-size: var(--t1); font-weight: 650; letter-spacing: -.03em; line-height: 1; }
+.heroi .grande small { font-size: var(--t2); font-weight: 600; color: var(--tinta-3); margin-left: 2px; }
 .heroi .lado {
-  font-size: 13px; color: var(--tinta-2); padding-left: 10px;
-  border-left: 1px solid var(--fio-forte); line-height: 1.25;
+  font-size: var(--t2); font-weight: 650; color: var(--tinta);
+  padding-left: 12px; border-left: 1px solid var(--fio-forte); font-variant-numeric: tabular-nums;
 }
-.heroi .lado b { color: var(--tinta); font-weight: 650; font-size: 15px; }
-.heroi .lado i { display: block; font-style: normal; font-size: 10.5px; color: var(--tinta-3); }
+.heroi .lado span { font-size: var(--t4); font-weight: 500; color: var(--tinta-3); margin-left: 4px; }
 
-/* as análises: menores, ao lado/abaixo do número principal */
-.analises { display: grid; gap: 0; border-top: 1px solid var(--fio); }
+/* análises */
+.analises { display: grid; }
 .analises > div {
-  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline;
-  padding: 5px 0; border-bottom: 1px solid var(--fio);
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline;
+  padding: 6px 0; border-top: 1px solid var(--fio);
 }
-.analises > div:last-child { border-bottom: 0; padding-bottom: 0; }
-.analises dt { font-size: 11.5px; color: var(--tinta-3); }
-.analises .base { font-size: 11.5px; color: var(--tinta-2); font-variant-numeric: tabular-nums; }
-.analises .var { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 62px; text-align: right; }
-.var[data-s="bom"]     { color: var(--bom-txt); }
-.var[data-s="ruim"]    { color: var(--critico-txt); }
-.var[data-s="neutro"]  { color: var(--tinta-2); }
-.falta-dado {
-  font-size: 10px; font-weight: 650; color: var(--tinta-3);
-  border: 1px dashed var(--fio-forte); border-radius: 5px; padding: 1px 6px; white-space: nowrap;
+.analises dt { font-size: var(--t3); color: var(--tinta-3); }
+.analises .base { font-size: var(--t3); color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+.analises .var { font-size: var(--t3); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 58px; text-align: right; }
+.var[data-s="bom"]    { color: var(--bom-txt); }
+.var[data-s="ruim"]   { color: var(--critico-txt); }
+.var[data-s="neutro"] { color: var(--tinta-3); }
+.falta {
+  font-size: var(--t4); color: var(--tinta-3);
+  border: 1px dashed var(--fio-forte); border-radius: 5px; padding: 0 6px; white-space: nowrap;
 }
 
-/* ---------- fundo de tendência: série real, sangrada na base do cartão ---------- */
-.tendencia { margin: 4px -16px -16px; position: relative; height: 40px; }
-.tendencia svg { display: block; width: 100%; height: 40px; }
-.tendencia .rot {
-  position: absolute; left: 16px; top: 2px;
-  font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--tinta-3);
-}
-.tendencia .extremos {
-  position: absolute; right: 14px; top: 2px;
-  font-size: 9.5px; color: var(--tinta-3); font-variant-numeric: tabular-nums;
-}
+/* tendência: banda própria na base, separada por fio. Nunca sobrepõe número. */
+.tendencia { margin: 12px -16px 0; border-top: 1px solid var(--fio); }
+.tendencia svg { display: block; width: 100%; height: 42px; }
 .tendencia.vazia {
-  height: 40px; display: flex; align-items: center; justify-content: center;
-  border-top: 1px dashed var(--fio-forte); margin-bottom: -16px;
+  height: 43px; display: flex; align-items: center; justify-content: center;
 }
-.tendencia.vazia span { font-size: 10px; color: var(--tinta-3); }
+.tendencia.vazia span { font-size: var(--t4); color: var(--tinta-3); }
 
-/* ---------- listas (motivos, diretorias) ---------- */
-.duplo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.mini-olho { white-space: nowrap; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--tinta-3); margin-bottom: 6px; display: block; }
-.rank { display: grid; gap: 6px; }
-.rank li { display: grid; grid-template-columns: 12px 1fr auto; gap: 7px; align-items: baseline; font-size: 11.5px; }
-.rank .pos { color: var(--tinta-3); font-weight: 700; }
+/* ---------- listas ---------- */
+.duplo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mini { font-size: var(--t4); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-3); margin-bottom: 8px; display: block; white-space: nowrap; }
+.rank { display: grid; gap: 8px; }
+.rank li { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; font-size: var(--t3); }
 .rank .nome { color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rank .val { color: var(--tinta); font-weight: 700; font-variant-numeric: tabular-nums; }
-.rank .barra { grid-column: 2 / -1; height: 3px; border-radius: 2px; background: var(--fio); overflow: hidden; margin-top: -2px; }
-.rank .barra i { display: block; height: 100%; border-radius: 2px; background: var(--cor, var(--acento)); }
+.rank .barra { grid-column: 1 / -1; height: 2px; border-radius: 1px; background: var(--fio-forte); overflow: hidden; }
+.rank .barra i { display: block; height: 100%; background: var(--cor, var(--acento)); }
 
-table.dir { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-table.dir th { text-align: right; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-3); font-weight: 700; padding: 0 0 5px; }
-table.dir th:first-child, table.dir td:first-child { text-align: left; }
-table.dir td { text-align: right; padding: 5px 0; border-top: 1px solid var(--fio); font-variant-numeric: tabular-nums; color: var(--tinta-2); }
-table.dir td:first-child { color: var(--tinta); font-weight: 650; }
-table.dir td.destaque { color: var(--tinta); font-weight: 700; }
-
-.nota {
-  margin-top: auto; padding-top: 8px; font-size: 10.5px; line-height: 1.45; color: var(--tinta-3);
-  border-top: 1px solid var(--fio);
+table.dir { width: 100%; border-collapse: collapse; font-size: var(--t3); }
+table.dir th {
+  text-align: right; font-size: var(--t4); letter-spacing: .05em; text-transform: uppercase;
+  color: var(--tinta-3); font-weight: 700; padding: 0 0 7px;
 }
+table.dir th:first-child, table.dir td:first-child { text-align: left; }
+table.dir td { text-align: right; padding: 6px 0; border-top: 1px solid var(--fio); font-variant-numeric: tabular-nums; color: var(--tinta-2); }
+table.dir td:first-child { color: var(--tinta); font-weight: 650; }
+table.dir td.forte { color: var(--tinta); font-weight: 700; }
+
+.nota { margin-top: auto; padding: 10px 0 0; font-size: var(--t4); line-height: 1.5; color: var(--tinta-3); }
 .nota b { color: var(--atencao-txt); font-weight: 650; }
 
 /* ---------- insight ---------- */
 .insight {
   background: var(--cartao); border: 1px solid var(--fio); border-left: 3px solid var(--acento);
-  border-radius: var(--raio); padding: 11px 15px;
-  display: flex; gap: 12px; align-items: flex-start;
+  border-radius: var(--raio); padding: 12px 16px;
 }
-.insight .marca { font-size: 15px; line-height: 1.2; }
-.insight p { font-size: 12.5px; line-height: 1.55; color: var(--tinta-2); max-width: 130ch; }
+.insight p { font-size: var(--t3); line-height: 1.6; color: var(--tinta-2); }
 .insight strong { color: var(--tinta); font-weight: 650; }
 
-/* ---------- modo compacto: cabe em notebook 1280x800 sem rolar ---------- */
+/* ---------- compacto: notebook 1280x800 sem rolar ---------- */
 @media (max-width: 1400px) and (min-width: 1181px) {
-  .tela { padding: 12px 16px 14px; gap: 10px; }
-  .topo h1 { font-size: 19px; }
-  .topo .sub { font-size: 11px; }
-  .linha { gap: 10px; }
-  .cartao { padding: 12px 13px 13px; gap: 7px; }
-  .cartao h3 { font-size: 13px; }
-  .heroi .grande { font-size: 29px; }
-  .heroi .lado b { font-size: 14px; }
-  .analises > div { padding: 4px 0; }
-  .analises dt, .analises .base { font-size: 11px; }
-  .tendencia, .tendencia svg, .tendencia.vazia { height: 34px; }
-  .tendencia { margin: 2px -13px -13px; }
-  .tendencia.vazia { margin-bottom: -13px; }
-  .nota { font-size: 10px; padding-top: 6px; }
-  .insight { padding: 9px 13px; }
-  .insight p { font-size: 12px; line-height: 1.5; }
+  .tela { --t0: 18px; --t1: 28px; padding: 13px 18px 15px; gap: 11px; }
+  .linha { gap: 11px; }
+  .cartao { padding: 13px 13px 0; }
+  .cartao.sem-grafico { padding-bottom: 13px; }
+  .cartao-topo { margin-bottom: 10px; }
+  .heroi { margin-bottom: 11px; }
+  .analises > div { padding: 5px 0; }
+  .tendencia { margin: 9px -13px 0; }
+  .tendencia svg, .tendencia.vazia { height: 36px; }
+  .rank { gap: 6px; }
+  .insight { padding: 10px 14px; }
 }
 
-/* ---------- responsivo: a mesma informação, empilhada ---------- */
-@media (max-width: 1180px) {
-  .linha-a { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .linha-b { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+/* ---------- empilhado ---------- */
+@media (max-width: 1180px) { .linha-a, .linha-b { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 680px) {
   .linha-a, .linha-b { grid-template-columns: minmax(0, 1fr); }
   .duplo { grid-template-columns: minmax(0, 1fr); }
-  .selos { margin-left: 0; }
-  .legenda { margin-left: 0; }
-  .heroi .grande { font-size: 30px; }
+  .selo, .periodo { margin-left: 0; }
 }
 </style>
 </head>
@@ -244,237 +210,196 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
 
 <div class="tela">
 
-  <!-- ============ cabeçalho ============ -->
   <div class="topo">
-    <div class="titulo">
-      <div class="barra"></div>
-      <div>
-        <h1>Status semanal de movimentações</h1>
-        <p class="sub">Visão executiva · Julho 2026 · fechado até a semana 30 (20–26/jul) · MTD com 4 de 4,4 semanas · Consolidado, todas as empresas</p>
-      </div>
+    <div class="barra"></div>
+    <div>
+      <h1>Movimentações</h1>
+      <p class="sub">Julho 2026 · fechado até a semana 30 · consolidado</p>
     </div>
-    <div class="selos">
-      <span class="selo modelo">◆ Modelo visual — não é o painel</span>
-      <span class="selo falta">16 campos aguardando dado</span>
-    </div>
+    <span class="selo">◆ Modelo visual · 16 campos sem dado</span>
   </div>
 
-  <!-- ============ filtros ============ -->
   <div class="filtros">
     <span class="filtro">Empresa: <b>Todas</b></span>
     <span class="filtro">Diretoria: <b>Todas</b></span>
     <span class="filtro">Área: <b>Todas</b></span>
     <div class="janela"><span>Semana</span><span data-on>Mês</span><span>Ano</span></div>
-    <div class="legenda">
-      <span><i class="pt pt-bom"></i>Melhorou</span>
-      <span><i class="pt pt-atencao"></i>Atenção</span>
-      <span><i class="pt pt-critico"></i>Piorou</span>
-      <span><i class="pt pt-nd"></i>Sem direção definida</span>
-    </div>
+    <span class="periodo">MTD com 4 de 4,4 semanas</span>
   </div>
 
-  <!-- ============ linha A — os 4 KPIs ============ -->
+  <!-- ===== os quatro indicadores ===== -->
   <div class="linha linha-a">
 
-    <!-- Turnover: o consolidador -->
     <article class="cartao consolidado" data-s="bom">
       <div class="cartao-topo">
-        <span class="olho">Consolidado</span>
+        <h3>Turnover geral</h3>
         <span class="chip" data-s="bom">▼ Melhorou</span>
       </div>
-      <h3>Turnover geral</h3>
       <div class="heroi">
         <span class="grande num">1,70<small>%</small></span>
-        <span class="lado"><b class="num">91</b><i>desligados no mês</i></span>
+        <span class="lado">91<span>saídas</span></span>
       </div>
       <dl class="analises">
-        <div><dt>Última semana (S30)</dt><dd class="base num">19</dd><dd class="var" data-s="neutro">0,36%</dd></div>
-        <div><dt>vs Jun/26</dt><dd class="base num">123</dd><dd class="var" data-s="bom">▼ 26,0%</dd></div>
-        <div><dt>vs Méd/mês 2026</dt><dd class="base num">119</dd><dd class="var" data-s="bom">▼ 23,5%</dd></div>
-        <div><dt>vs Méd/mês 2025</dt><dd class="base num">105</dd><dd class="var" data-s="bom">▼ 13,3%</dd></div>
+        <div><dt>Semana 30</dt><dd class="base num">19</dd><dd class="var" data-s="neutro">0,36%</dd></div>
+        <div><dt>Junho</dt><dd class="base num">123</dd><dd class="var" data-s="bom">▼ 26,0%</dd></div>
+        <div><dt>Média/mês 2026</dt><dd class="base num">119</dd><dd class="var" data-s="bom">▼ 23,5%</dd></div>
+        <div><dt>Média/mês 2025</dt><dd class="base num">105</dd><dd class="var" data-s="bom">▼ 13,3%</dd></div>
       </dl>
-          <div class="tendencia">
-        <span class="rot">jan–jul 2026</span><span class="extremos">93 → 91</span>
-        <svg viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 35.0 L50 8.0 L100 23.5 L150 22.0 L200 24.0 L250 20.0 L300 36.0 L300 40 L0 40 Z" fill="var(--bom)" opacity=".16"/>
-          <path d="M0 35.0 L50 8.0 L100 23.5 L150 22.0 L200 24.0 L250 20.0 L300 36.0" fill="none" stroke="var(--bom)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <div class="tendencia">
+        <svg viewBox="0 0 300 42" preserveAspectRatio="none" role="img" aria-label="Tendência mensal de janeiro a julho de 2026: 93, 147, 116, 119, 115, 123, 91">
+          <path d="M0 33.1 L50 8.0 L100 22.4 L150 21.0 L200 22.9 L250 19.1 L300 34.0 L300 42 L0 42 Z" fill="var(--bom)" opacity=".1"/>
+          <path d="M0 33.1 L50 8.0 L100 22.4 L150 21.0 L200 22.9 L250 19.1 L300 34.0" fill="none" stroke="var(--bom)" stroke-width="1.5" stroke-linejoin="round" opacity=".8" vector-effect="non-scaling-stroke"/>
         </svg>
       </div>
     </article>
 
-    <!-- Voluntários -->
     <article class="cartao" data-s="bom">
       <div class="cartao-topo">
-        <span class="olho">Subgrupo</span>
+        <h3>Voluntários</h3>
         <span class="chip" data-s="bom">▼ Melhorou</span>
       </div>
-      <h3>Desligamentos voluntários</h3>
       <div class="heroi">
         <span class="grande num">0,92<small>%</small></span>
-        <span class="lado"><b class="num">49</b><i>pedidos de demissão</i></span>
+        <span class="lado">49<span>saídas</span></span>
       </div>
       <dl class="analises">
-        <div><dt>Última semana (S30)</dt><dd class="base num">7</dd><dd class="var" data-s="neutro">0,13%</dd></div>
-        <div><dt>vs Jun/26</dt><dd class="base num">78</dd><dd class="var" data-s="bom">▼ 37,2%</dd></div>
-        <div><dt>vs Méd/mês 2026</dt><dd class="base num">75,3</dd><dd class="var" data-s="bom">▼ 34,9%</dd></div>
-        <div><dt>vs Méd/mês 2025</dt><dd class="base num">74,6</dd><dd class="var" data-s="bom">▼ 34,3%</dd></div>
+        <div><dt>Semana 30</dt><dd class="base num">7</dd><dd class="var" data-s="neutro">0,13%</dd></div>
+        <div><dt>Junho</dt><dd class="base num">78</dd><dd class="var" data-s="bom">▼ 37,2%</dd></div>
+        <div><dt>Média/mês 2026</dt><dd class="base num">75,3</dd><dd class="var" data-s="bom">▼ 34,9%</dd></div>
+        <div><dt>Média/mês 2025</dt><dd class="base num">74,6</dd><dd class="var" data-s="bom">▼ 34,3%</dd></div>
       </dl>
-          <div class="tendencia">
-        <span class="rot">jan–jul 2026</span><span class="extremos">69 → 49</span>
-        <svg viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 19.0 L50 24.1 L100 8.0 L150 8.0 L200 11.4 L250 11.4 L300 36.0 L300 40 L0 40 Z" fill="var(--bom)" opacity=".16"/>
-          <path d="M0 19.0 L50 24.1 L100 8.0 L150 8.0 L200 11.4 L250 11.4 L300 36.0" fill="none" stroke="var(--bom)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <div class="tendencia">
+        <svg viewBox="0 0 300 42" preserveAspectRatio="none" role="img" aria-label="Tendência mensal de janeiro a julho de 2026: 69, 63, 82, 82, 78, 78, 49">
+          <path d="M0 18.2 L50 23.0 L100 8.0 L150 8.0 L200 11.2 L250 11.2 L300 34.0 L300 42 L0 42 Z" fill="var(--bom)" opacity=".1"/>
+          <path d="M0 18.2 L50 23.0 L100 8.0 L150 8.0 L200 11.2 L250 11.2 L300 34.0" fill="none" stroke="var(--bom)" stroke-width="1.5" stroke-linejoin="round" opacity=".8" vector-effect="non-scaling-stroke"/>
         </svg>
       </div>
     </article>
 
-    <!-- Involuntários -->
     <article class="cartao" data-s="atencao">
       <div class="cartao-topo">
-        <span class="olho">Subgrupo</span>
+        <h3>Involuntários</h3>
         <span class="chip" data-s="atencao">▲ Atenção</span>
       </div>
-      <h3>Desligamentos involuntários</h3>
       <div class="heroi">
         <span class="grande num">0,79<small>%</small></span>
-        <span class="lado"><b class="num">42</b><i>por decisão da empresa</i></span>
+        <span class="lado">42<span>saídas</span></span>
       </div>
       <dl class="analises">
-        <div><dt>Última semana (S30)</dt><dd class="base num">12</dd><dd class="var" data-s="neutro">0,22%</dd></div>
-        <div><dt>vs Jun/26</dt><dd class="base num">45</dd><dd class="var" data-s="bom">▼ 6,7%</dd></div>
-        <div><dt>vs Méd/mês 2026</dt><dd class="base num">43,5</dd><dd class="var" data-s="bom">▼ 3,4%</dd></div>
-        <div><dt>vs Méd/mês 2025</dt><dd class="base num">32,7</dd><dd class="var" data-s="ruim">▲ 28,4%</dd></div>
+        <div><dt>Semana 30</dt><dd class="base num">12</dd><dd class="var" data-s="neutro">0,22%</dd></div>
+        <div><dt>Junho</dt><dd class="base num">45</dd><dd class="var" data-s="bom">▼ 6,7%</dd></div>
+        <div><dt>Média/mês 2026</dt><dd class="base num">43,5</dd><dd class="var" data-s="bom">▼ 3,4%</dd></div>
+        <div><dt>Média/mês 2025</dt><dd class="base num">32,7</dd><dd class="var" data-s="ruim">▲ 28,4%</dd></div>
       </dl>
-          <div class="tendencia">
-        <span class="rot">jan–jul 2026</span><span class="extremos">24 → 42</span>
-        <svg viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 36.0 L50 8.0 L100 31.3 L150 29.9 L200 29.9 L250 26.2 L300 27.6 L300 40 L0 40 Z" fill="var(--atencao)" opacity=".16"/>
-          <path d="M0 36.0 L50 8.0 L100 31.3 L150 29.9 L200 29.9 L250 26.2 L300 27.6" fill="none" stroke="var(--atencao)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <div class="tendencia">
+        <svg viewBox="0 0 300 42" preserveAspectRatio="none" role="img" aria-label="Tendência mensal de janeiro a julho de 2026: 24, 84, 34, 37, 37, 45, 42">
+          <path d="M0 34.0 L50 8.0 L100 29.7 L150 28.4 L200 28.4 L250 24.9 L300 26.2 L300 42 L0 42 Z" fill="var(--atencao)" opacity=".1"/>
+          <path d="M0 34.0 L50 8.0 L100 29.7 L150 28.4 L200 28.4 L250 24.9 L300 26.2" fill="none" stroke="var(--atencao)" stroke-width="1.5" stroke-linejoin="round" opacity=".8" vector-effect="non-scaling-stroke"/>
         </svg>
       </div>
     </article>
 
-    <!-- Admitidos -->
     <article class="cartao" data-s="nd">
       <div class="cartao-topo">
-        <span class="olho">Subgrupo</span>
-        <span class="chip" data-s="nd">Direção não definida</span>
+        <h3>Admitidos</h3>
+        <span class="chip" data-s="nd">Sem direção</span>
       </div>
-      <h3>Admitidos</h3>
       <div class="heroi">
         <span class="grande num">1,46<small>%</small></span>
-        <span class="lado"><b class="num">78</b><i>entradas no mês</i></span>
+        <span class="lado">78<span>entradas</span></span>
       </div>
       <dl class="analises">
-        <div><dt>Última semana (S30)</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
-        <div><dt>vs Jun/26</dt><dd class="base num">85</dd><dd class="var" data-s="neutro">▼ 8,2%</dd></div>
-        <div><dt>vs Méd/mês 2026</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
-        <div><dt>vs Méd/mês 2025</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
+        <div><dt>Semana 30</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
+        <div><dt>Junho</dt><dd class="base num">85</dd><dd class="var" data-s="neutro">▼ 8,2%</dd></div>
+        <div><dt>Média/mês 2026</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
+        <div><dt>Média/mês 2025</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
       </dl>
-          <div class="tendencia vazia"><span>série mensal sem dado</span></div>
+      <div class="tendencia vazia"><span>série mensal sem dado</span></div>
     </article>
   </div>
 
-  <!-- ============ linha B — quem sai e por quê ============ -->
+  <!-- ===== quem sai, por quê, onde ===== -->
   <div class="linha linha-b">
 
-    <!-- Líderes -->
-    <article class="cartao" data-s="critico">
+    <article class="cartao sem-grafico" data-s="critico">
       <div class="cartao-topo">
-        <span class="olho">Quem sai</span>
+        <h3>Líderes desligados</h3>
         <span class="chip" data-s="critico">▲ Piorou</span>
       </div>
-      <h3>Líderes desligados</h3>
       <div class="heroi">
         <span class="grande num">9</span>
-        <span class="lado"><b class="num">9,9%</b><i>das saídas do mês</i></span>
+        <span class="lado">9,9%<span>das saídas</span></span>
       </div>
       <dl class="analises">
-        <div><dt>Taxa sobre o total de líderes</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
-        <div><dt>vs Jun/26</dt><dd class="base num">4</dd><dd class="var" data-s="ruim">▲ 125%</dd></div>
-        <div><dt>vs Méd/mês 2026</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
-        <div><dt>vs Méd/mês 2025</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
+        <div><dt>Taxa sobre líderes</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
+        <div><dt>Junho</dt><dd class="base num">4</dd><dd class="var" data-s="ruim">▲ 125%</dd></div>
+        <div><dt>Média/mês 2026</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
+        <div><dt>Média/mês 2025</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
       </dl>
     </article>
 
-    <!-- Até 1 ano -->
-    <article class="cartao" data-s="nd">
+    <article class="cartao sem-grafico" data-s="nd">
       <div class="cartao-topo">
-        <span class="olho">Quem sai</span>
+        <h3>Até 1 ano</h3>
         <span class="chip" data-s="nd">Sem comparativo</span>
       </div>
-      <h3>Colaboradores até 1 ano</h3>
       <div class="heroi">
         <span class="grande num">32</span>
-        <span class="lado"><b class="num">35,2%</b><i>das saídas do mês</i></span>
+        <span class="lado">35,2%<span>das saídas</span></span>
       </div>
       <dl class="analises">
-        <div><dt>Taxa sobre quem tem &lt; 1 ano</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
-        <div><dt>vs Jun/26</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
-        <div><dt>vs Méd/mês 2026</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
-        <div><dt>vs Méd/mês 2025</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
+        <div><dt>Taxa de incidência</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
+        <div><dt>Junho</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
+        <div><dt>Média/mês 2026</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
+        <div><dt>Média/mês 2025</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>
       </dl>
     </article>
 
-    <!-- Motivos, separados por família -->
-    <article class="cartao" data-s="atencao">
+    <article class="cartao sem-grafico" data-s="atencao">
       <div class="cartao-topo">
-        <span class="olho">Por quê</span>
-        <h3 style="margin-left:-2px">Top 3 motivos</h3>
+        <h3>Motivos de saída</h3>
         <span class="chip" data-s="atencao">Codificação frágil</span>
       </div>
       <div class="duplo">
         <div>
-          <span class="mini-olho">Voluntário · 49</span>
+          <span class="mini">Voluntário · 49</span>
           <ol class="rank">
-            <li><span class="pos">1</span><span class="nome">Particular</span><span class="val">40</span>
-                <span class="barra" style="--cor:var(--critico)"><i style="width:82%"></i></span></li>
-            <li><span class="pos">2</span><span class="nome">Proposta externa</span><span class="val">4</span>
-                <span class="barra" style="--cor:var(--acento)"><i style="width:8%"></i></span></li>
-            <li><span class="pos">3</span><span class="nome">Mudança de cidade</span><span class="val">2</span>
-                <span class="barra" style="--cor:var(--acento)"><i style="width:4%"></i></span></li>
+            <li><span class="nome">Particular</span><span class="val">40</span><span class="barra" style="--cor:var(--critico)"><i style="width:82%"></i></span></li>
+            <li><span class="nome">Proposta externa</span><span class="val">4</span><span class="barra"><i style="width:8%"></i></span></li>
+            <li><span class="nome">Mudança de cidade</span><span class="val">2</span><span class="barra"><i style="width:4%"></i></span></li>
           </ol>
         </div>
         <div>
-          <span class="mini-olho">Involuntário · 42</span>
+          <span class="mini">Involuntário · 42</span>
           <ol class="rank">
-            <li><span class="pos">1</span><span class="nome">Performance</span><span class="val">16</span>
-                <span class="barra" style="--cor:var(--acento)"><i style="width:38%"></i></span></li>
-            <li><span class="pos">2</span><span class="nome">Cultura organizacional</span><span class="val">7</span>
-                <span class="barra" style="--cor:var(--acento)"><i style="width:17%"></i></span></li>
-            <li><span class="pos">3</span><span class="nome">Redução de quadro</span><span class="val">7</span>
-                <span class="barra" style="--cor:var(--acento)"><i style="width:17%"></i></span></li>
+            <li><span class="nome">Performance</span><span class="val">16</span><span class="barra"><i style="width:38%"></i></span></li>
+            <li><span class="nome">Cultura organizacional</span><span class="val">7</span><span class="barra"><i style="width:17%"></i></span></li>
+            <li><span class="nome">Redução de quadro</span><span class="val">7</span><span class="barra"><i style="width:17%"></i></span></li>
           </ol>
         </div>
       </div>
-      <p class="nota"><b>“Particular” concentra 82% dos pedidos de demissão.</b> O motivo mais frequente é, na prática, “não sabemos” — achado de codificação, não de visualização.</p>
+      <p class="nota"><b>“Particular” = 82% dos pedidos de demissão.</b> O motivo mais frequente é “não sabemos”: achado de codificação, não de visualização.</p>
     </article>
 
-    <!-- Diretorias -->
-    <article class="cartao" data-s="nd">
+    <article class="cartao sem-grafico" data-s="nd">
       <div class="cartao-topo">
-        <span class="olho">Onde</span>
-        <h3 style="margin-left:-2px">Diretorias — top 3</h3>
-        <span class="chip" data-s="nd">Ranking por volume</span>
+        <h3>Diretorias</h3>
+        <span class="chip" data-s="nd">Por volume</span>
       </div>
       <table class="dir">
-        <thead>
-          <tr><th>Diretoria</th><th>Vol.</th><th>Inv.</th><th>Total</th><th>% saídas</th><th>Taxa</th><th>Índice</th></tr>
-        </thead>
+        <thead><tr><th>Diretoria</th><th>Vol.</th><th>Inv.</th><th>Total</th><th>% saídas</th><th>Taxa</th><th>Índice</th></tr></thead>
         <tbody>
-          <tr><td>FLO</td><td>32</td><td>29</td><td class="destaque">61</td><td>67,0%</td><td><span class="falta-dado">—</span></td><td><span class="falta-dado">—</span></td></tr>
-          <tr><td>IND</td><td>6</td><td>6</td><td class="destaque">12</td><td>13,2%</td><td><span class="falta-dado">—</span></td><td><span class="falta-dado">—</span></td></tr>
-          <tr><td>TRP</td><td>6</td><td>1</td><td class="destaque">7</td><td>7,7%</td><td><span class="falta-dado">—</span></td><td><span class="falta-dado">—</span></td></tr>
+          <tr><td>FLO</td><td>32</td><td>29</td><td class="forte">61</td><td>67,0%</td><td><span class="falta">—</span></td><td><span class="falta">—</span></td></tr>
+          <tr><td>IND</td><td>6</td><td>6</td><td class="forte">12</td><td>13,2%</td><td><span class="falta">—</span></td><td><span class="falta">—</span></td></tr>
+          <tr><td>TRP</td><td>6</td><td>1</td><td class="forte">7</td><td>7,7%</td><td><span class="falta">—</span></td><td><span class="falta">—</span></td></tr>
         </tbody>
       </table>
-      <p class="nota"><b>Sem headcount por diretoria, este ranking é de tamanho, não de risco.</b> Com ele, “Taxa” vira saídas ÷ quadro e “Índice” vira participação nas saídas ÷ participação no quadro: 1,0× é proporcional.</p>
+      <p class="nota"><b>Ranking de tamanho, não de risco.</b> Falta headcount por diretoria para calcular taxa e índice de sobre-representação.</p>
     </article>
   </div>
 
-  <!-- ============ insight ============ -->
   <div class="insight">
-    <span class="marca">💡</span>
-    <p><strong>Leitura de julho:</strong> o volume desacelera (−26% vs junho), puxado pelo voluntário (−37%). <strong>O ponto de atenção é o involuntário:</strong> quase igual à média de 2026, mas <strong>+28% acima da média de 2025</strong> — a régua escolhida muda o sinal, e por isso as duas médias ficam lado a lado. <strong>O alerta são os líderes:</strong> 9 saídas contra 4 em junho; sem o total de líderes não dá para dizer se 9 é muito.</p>
+    <p><strong>Julho:</strong> volume desacelera 26% vs junho, puxado pelo voluntário (−37%). <strong>Atenção no involuntário</strong> — igual à média de 2026, mas <strong>+28% acima da média de 2025</strong>: a régua muda o sinal. <strong>Alerta nos líderes:</strong> 9 saídas contra 4 em junho, e sem o total de líderes não dá para dizer se 9 é muito.</p>
   </div>
 
 </div>
