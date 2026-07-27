@@ -154,6 +154,24 @@
   border: 1px dashed var(--fio-forte); border-radius: 5px; padding: 1px 6px; white-space: nowrap;
 }
 
+/* ---------- fundo de tendência: série real, sangrada na base do cartão ---------- */
+.tendencia { margin: 4px -16px -16px; position: relative; height: 40px; }
+.tendencia svg { display: block; width: 100%; height: 40px; }
+.tendencia .rot {
+  position: absolute; left: 16px; top: 2px;
+  font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--tinta-3);
+}
+.tendencia .extremos {
+  position: absolute; right: 14px; top: 2px;
+  font-size: 9.5px; color: var(--tinta-3); font-variant-numeric: tabular-nums;
+}
+.tendencia.vazia {
+  height: 40px; display: flex; align-items: center; justify-content: center;
+  border-top: 1px dashed var(--fio-forte); margin-bottom: -16px;
+}
+.tendencia.vazia span { font-size: 10px; color: var(--tinta-3); }
+
 /* ---------- listas (motivos, diretorias) ---------- */
 .duplo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .mini-olho { white-space: nowrap; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--tinta-3); margin-bottom: 6px; display: block; }
@@ -188,6 +206,26 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
 .insight p { font-size: 12.5px; line-height: 1.55; color: var(--tinta-2); max-width: 130ch; }
 .insight strong { color: var(--tinta); font-weight: 650; }
 
+/* ---------- modo compacto: cabe em notebook 1280x800 sem rolar ---------- */
+@media (max-width: 1400px) and (min-width: 1181px) {
+  .tela { padding: 12px 16px 14px; gap: 10px; }
+  .topo h1 { font-size: 19px; }
+  .topo .sub { font-size: 11px; }
+  .linha { gap: 10px; }
+  .cartao { padding: 12px 13px 13px; gap: 7px; }
+  .cartao h3 { font-size: 13px; }
+  .heroi .grande { font-size: 29px; }
+  .heroi .lado b { font-size: 14px; }
+  .analises > div { padding: 4px 0; }
+  .analises dt, .analises .base { font-size: 11px; }
+  .tendencia, .tendencia svg, .tendencia.vazia { height: 34px; }
+  .tendencia { margin: 2px -13px -13px; }
+  .tendencia.vazia { margin-bottom: -13px; }
+  .nota { font-size: 10px; padding-top: 6px; }
+  .insight { padding: 9px 13px; }
+  .insight p { font-size: 12px; line-height: 1.5; }
+}
+
 /* ---------- responsivo: a mesma informação, empilhada ---------- */
 @media (max-width: 1180px) {
   .linha-a { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -212,7 +250,7 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
       <div class="barra"></div>
       <div>
         <h1>Status semanal de movimentações</h1>
-        <p class="sub">Visão executiva · Julho 2026 · fechado até a semana 30 (20–26/jul) · Consolidado, todas as empresas</p>
+        <p class="sub">Visão executiva · Julho 2026 · fechado até a semana 30 (20–26/jul) · MTD com 4 de 4,4 semanas · Consolidado, todas as empresas</p>
       </div>
     </div>
     <div class="selos">
@@ -255,6 +293,13 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
         <div><dt>vs Méd/mês 2026</dt><dd class="base num">119</dd><dd class="var" data-s="bom">▼ 23,5%</dd></div>
         <div><dt>vs Méd/mês 2025</dt><dd class="base num">105</dd><dd class="var" data-s="bom">▼ 13,3%</dd></div>
       </dl>
+          <div class="tendencia">
+        <span class="rot">jan–jul 2026</span><span class="extremos">93 → 91</span>
+        <svg viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 35.0 L50 8.0 L100 23.5 L150 22.0 L200 24.0 L250 20.0 L300 36.0 L300 40 L0 40 Z" fill="var(--bom)" opacity=".16"/>
+          <path d="M0 35.0 L50 8.0 L100 23.5 L150 22.0 L200 24.0 L250 20.0 L300 36.0" fill="none" stroke="var(--bom)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
     </article>
 
     <!-- Voluntários -->
@@ -274,6 +319,13 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
         <div><dt>vs Méd/mês 2026</dt><dd class="base num">75,3</dd><dd class="var" data-s="bom">▼ 34,9%</dd></div>
         <div><dt>vs Méd/mês 2025</dt><dd class="base num">74,6</dd><dd class="var" data-s="bom">▼ 34,3%</dd></div>
       </dl>
+          <div class="tendencia">
+        <span class="rot">jan–jul 2026</span><span class="extremos">69 → 49</span>
+        <svg viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 19.0 L50 24.1 L100 8.0 L150 8.0 L200 11.4 L250 11.4 L300 36.0 L300 40 L0 40 Z" fill="var(--bom)" opacity=".16"/>
+          <path d="M0 19.0 L50 24.1 L100 8.0 L150 8.0 L200 11.4 L250 11.4 L300 36.0" fill="none" stroke="var(--bom)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
     </article>
 
     <!-- Involuntários -->
@@ -293,6 +345,13 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
         <div><dt>vs Méd/mês 2026</dt><dd class="base num">43,5</dd><dd class="var" data-s="bom">▼ 3,4%</dd></div>
         <div><dt>vs Méd/mês 2025</dt><dd class="base num">32,7</dd><dd class="var" data-s="ruim">▲ 28,4%</dd></div>
       </dl>
+          <div class="tendencia">
+        <span class="rot">jan–jul 2026</span><span class="extremos">24 → 42</span>
+        <svg viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 36.0 L50 8.0 L100 31.3 L150 29.9 L200 29.9 L250 26.2 L300 27.6 L300 40 L0 40 Z" fill="var(--atencao)" opacity=".16"/>
+          <path d="M0 36.0 L50 8.0 L100 31.3 L150 29.9 L200 29.9 L250 26.2 L300 27.6" fill="none" stroke="var(--atencao)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
     </article>
 
     <!-- Admitidos -->
@@ -312,6 +371,7 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
         <div><dt>vs Méd/mês 2026</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
         <div><dt>vs Méd/mês 2025</dt><dd class="base"></dd><dd><span class="falta-dado">sem dado</span></dd></div>
       </dl>
+          <div class="tendencia vazia"><span>série mensal sem dado</span></div>
     </article>
   </div>
 
@@ -387,7 +447,7 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
           </ol>
         </div>
       </div>
-      <p class="nota"><b>“Particular” concentra 82% dos pedidos de demissão.</b> O motivo mais frequente é, na prática, “não sabemos” — é achado de codificação na entrevista de desligamento, não de visualização.</p>
+      <p class="nota"><b>“Particular” concentra 82% dos pedidos de demissão.</b> O motivo mais frequente é, na prática, “não sabemos” — achado de codificação, não de visualização.</p>
     </article>
 
     <!-- Diretorias -->
@@ -407,16 +467,14 @@ table.dir td.destaque { color: var(--tinta); font-weight: 700; }
           <tr><td>TRP</td><td>6</td><td>1</td><td class="destaque">7</td><td>7,7%</td><td><span class="falta-dado">—</span></td><td><span class="falta-dado">—</span></td></tr>
         </tbody>
       </table>
-      <p class="nota"><b>Sem headcount por diretoria, este ranking é de tamanho, não de risco.</b> Com ele, “Taxa” vira saídas ÷ quadro da diretoria e “Índice” vira participação nas saídas ÷ participação no quadro — 1,0× é proporcional, acima disso a diretoria perde mais gente do que seu tamanho justifica.</p>
+      <p class="nota"><b>Sem headcount por diretoria, este ranking é de tamanho, não de risco.</b> Com ele, “Taxa” vira saídas ÷ quadro e “Índice” vira participação nas saídas ÷ participação no quadro: 1,0× é proporcional.</p>
     </article>
   </div>
 
   <!-- ============ insight ============ -->
   <div class="insight">
     <span class="marca">💡</span>
-    <p><strong>Leitura de julho:</strong> o volume total desacelera (−26% vs junho, −23% vs a média mensal de 2026), puxado pelo voluntário, que cai 37% e sustenta a tese de retenção estabilizando.
-    <strong>O ponto de atenção é o involuntário:</strong> quase igual à média de 2026, mas <strong>+28% acima da média mensal de 2025</strong> — a régua escolhida muda o sinal, e é por isso que as duas médias precisam ficar visíveis lado a lado.
-    <strong>E o alerta da semana são os líderes:</strong> 9 saídas contra 4 em junho. Sem o total de líderes não dá para dizer se 9 é muito — é o dado que mais falta nesta tela.</p>
+    <p><strong>Leitura de julho:</strong> o volume desacelera (−26% vs junho), puxado pelo voluntário (−37%). <strong>O ponto de atenção é o involuntário:</strong> quase igual à média de 2026, mas <strong>+28% acima da média de 2025</strong> — a régua escolhida muda o sinal, e por isso as duas médias ficam lado a lado. <strong>O alerta são os líderes:</strong> 9 saídas contra 4 em junho; sem o total de líderes não dá para dizer se 9 é muito.</p>
   </div>
 
 </div>
