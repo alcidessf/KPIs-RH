@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movimentações — Status semanal</title>
+<style>
+/* ============================================================================
+   PAINEL DE MOVIMENTAÇÕES — arquivo único, sem dependência externa.
+   Roda de pasta de rede, por duplo clique. Não faz nenhuma chamada de rede.
+
+   O bloco .slide é 16:9: um print dele entra num slide de PPT sem sobra.
+   Todas as medidas de dentro do slide estão em cqw (percentual da largura do
+   container), então a tela inteira escala como uma peça só.
+
+   Cores: paleta institucional. As variantes de farol foram escolhidas por
+   contraste medido sobre o papel #F7F8F5 — o amarelo institucional #D6C500
+   tem 1,66:1 e não pode carregar significado sozinho, por isso a marca usa
+   #877C00 (4,01:1) e o amarelo puro só aparece como preenchimento de chip.
+   ============================================================================ */
+
+:root {
+  /* --- paleta institucional --- */
+  --verde-escuro:  #2E4C46;
+  --verde:         #00694A;
+  --verde-claro:   #5FB35A;
+  --amarelo:       #D6C500;
+  --verde-palha:   #DCE6A6;
+  --azul:          #1C6D96;
+  --tijolo:        #B54728;
+  --terracota:     #C56C33;
+  --ocre:          #CC9433;
+
+  /* --- superfícies e tinta --- */
+  --papel:   #F7F8F5;
+  --cartao:  #FFFFFF;
+  --fio:     #E3E7E0;
+  --fio-forte: #CBD2CA;
+  --tinta:   #1E2A26;
+  --tinta-2: #4A5751;
+  --tinta-3: #6E7873;
+
+  /* --- farol (contraste verificado) --- */
+  --bom-marca: #00694A;  --bom-chip: #E4F0EA;  --bom-txt: #00563C;
+  --atn-marca: #877C00;  --atn-chip: #FAF4D0;  --atn-txt: #6E6400;
+  --cri-marca: #B54728;  --cri-chip: #F7E7E1;  --cri-txt: #8E3720;
+  --neu-marca: #6E7873;  --neu-chip: #EDEFEA;  --neu-txt: #5A6560;
+
+  --fonte: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #E9ECE7; color: var(--tinta);
+  font-family: var(--fonte); -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, dl, dd, dt, ol, li, figure { margin: 0; padding: 0; }
+ol { list-style: none; }
+
+/* ====================== barra de ferramentas (fora do slide) ============== */
+.ferramentas {
+  max-width: 1600px; margin: 0 auto; padding: 10px 4px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.ferramentas .marca { font-size: 12px; font-weight: 700; color: var(--verde-escuro); margin-right: auto; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 0 12px; border-radius: 7px; cursor: pointer;
+  background: #fff; color: var(--tinta-2); border: 1px solid var(--fio-forte);
+  font: 600 12px var(--fonte);
+}
+.btn:hover { background: var(--papel); color: var(--tinta); }
+.btn.primario { background: var(--verde); color: #fff; border-color: var(--verde); }
+.btn.primario:hover { background: #00563C; color: #fff; }
+.btn:focus-visible, [contenteditable]:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
+
+.painel-dados {
+  max-width: 1600px; margin: 0 auto 10px; padding: 14px 16px;
+  background: #fff; border: 1px solid var(--fio-forte); border-radius: 10px;
+}
+.painel-dados[hidden] { display: none; }
+.painel-dados h2 { font-size: 13px; color: var(--verde-escuro); margin-bottom: 4px; }
+.painel-dados p { font-size: 12px; color: var(--tinta-2); line-height: 1.5; margin-bottom: 10px; }
+.painel-dados textarea {
+  width: 100%; min-height: 150px; padding: 10px; border: 1px solid var(--fio-forte);
+  border-radius: 7px; font: 12px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  resize: vertical; background: var(--papel); color: var(--tinta);
+}
+.painel-acoes { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.aviso { font-size: 12px; font-weight: 600; }
+.aviso[data-t="erro"] { color: var(--cri-txt); }
+.aviso[data-t="ok"]   { color: var(--bom-txt); }
+
+/* ====================== o slide 16:9 ===================================== */
+.slide {
+  container-type: inline-size;
+  width: 100%; max-width: 1600px; aspect-ratio: 16 / 9;
+  margin: 0 auto; background: var(--papel);
+  border: 1px solid var(--fio-forte);
+  padding: 1.4cqw 1.6cqw;
+  display: flex; flex-direction: column; gap: 0.85cqw;
+  overflow: hidden;
+}
+
+/* --- cabeçalho --- */
+.cabecalho { display: flex; align-items: center; gap: 1cqw; }
+.logo {
+  height: 2.6cqw; width: auto; max-width: 11cqw; object-fit: contain; flex: none;
+}
+.logo-vazio {
+  height: 2.6cqw; width: 7cqw; flex: none; border: 1px dashed var(--fio-forte);
+  border-radius: 0.25cqw; display: flex; align-items: center; justify-content: center;
+  font-size: 0.6cqw; letter-spacing: .12em; color: var(--tinta-3);
+}
+/* display:flex sobrepõe o atributo hidden — sem isto o placeholder fica visível
+   ao lado da logo real */
+.logo-vazio[hidden] { display: none; }
+.cabecalho .divisor { width: 1px; align-self: stretch; background: var(--fio); }
+.cabecalho h1 { font-size: 1.35cqw; font-weight: 700; color: var(--verde-escuro); letter-spacing: -.01em; }
+.cabecalho .sub { font-size: 0.75cqw; color: var(--tinta-3); margin-top: 0.1cqw; }
+.cabecalho .selo {
+  margin-left: auto; font-size: 0.66cqw; font-weight: 700; color: var(--atn-txt);
+  background: var(--atn-chip); border: 1px solid rgba(135, 124, 0, .3);
+  padding: 0.25cqw 0.6cqw; border-radius: 999px; white-space: nowrap;
+}
+.cabecalho .selo[hidden] { display: none; }
+
+/* --- filtros --- */
+.filtros {
+  display: flex; align-items: center; gap: 0.5cqw; flex-wrap: nowrap;
+  background: var(--cartao); border: 1px solid var(--fio); border-radius: 0.5cqw;
+  padding: 0.45cqw 0.7cqw;
+}
+/* Controles de verdade: o painel agrega a base conforme a seleção. */
+.campo { display: inline-flex; align-items: center; gap: 0.4cqw; font-size: 0.72cqw; color: var(--tinta-3); }
+.campo select {
+  font: inherit; color: var(--tinta-2); background: var(--papel);
+  border: 1px solid var(--fio-forte); border-radius: 0.35cqw;
+  padding: 0.28cqw 0.5cqw; max-width: 13cqw; cursor: pointer;
+}
+.campo select:focus-visible { outline: 2px solid var(--azul); outline-offset: 1px; }
+.janela { display: flex; gap: 0.1cqw; padding: 0.12cqw; background: var(--papel); border: 1px solid var(--fio); border-radius: 0.4cqw; }
+.janela button {
+  font: inherit; font-size: 0.72cqw; font-weight: 600; color: var(--tinta-3);
+  padding: 0.28cqw 0.75cqw; border: 0; border-radius: 0.3cqw; background: transparent; cursor: pointer;
+}
+.janela button[aria-pressed="true"] { background: var(--verde); color: #fff; }
+.limpar {
+  font: inherit; font-size: 0.72cqw; font-weight: 600; color: var(--azul);
+  background: none; border: 0; cursor: pointer; text-decoration: underline; padding: 0;
+}
+.limpar[hidden] { display: none; }
+table.dir td.alerta { color: var(--cri-txt); font-weight: 700; }
+.resumo-base { font-size: 11px; color: var(--tinta-3); margin-top: 10px !important; }
+.regua { margin-left: auto; font-size: 0.72cqw; color: var(--tinta-3); white-space: nowrap; }
+
+/* --- grade --- */
+.linha { display: grid; gap: 0.85cqw; }
+/* as duas faixas repartem a altura livre do slide 16:9 */
+.linha-a { grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 1.06; }
+.linha-b { flex: 1; }
+.linha-b { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.3fr); }
+.linha > .cartao { height: 100%; }
+
+.cartao {
+  background: var(--cartao); border: 1px solid var(--fio); border-radius: 0.5cqw;
+  padding: 0.9cqw 0.95cqw 0; position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.cartao::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 0.2cqw; background: var(--faixa); }
+.cartao[data-s="bom"]     { --faixa: var(--bom-marca); }
+.cartao[data-s="atencao"] { --faixa: var(--atn-marca); }
+.cartao[data-s="critico"] { --faixa: var(--cri-marca); }
+.cartao[data-s="nd"]      { --faixa: var(--neu-marca); }
+.cartao.sem-grafico { padding-bottom: 0.9cqw; }
+
+.cartao-topo { display: flex; align-items: center; gap: 0.5cqw; margin-bottom: 0.7cqw; }
+.cartao h3 { font-size: 0.9cqw; font-weight: 700; color: var(--tinta); white-space: nowrap; }
+.chip {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 0.2cqw;
+  padding: 0.18cqw 0.5cqw; border-radius: 999px;
+  font-size: 0.66cqw; font-weight: 700; white-space: nowrap;
+}
+.chip[data-s="bom"]     { background: var(--bom-chip); color: var(--bom-txt); }
+.chip[data-s="atencao"] { background: var(--atn-chip); color: var(--atn-txt); }
+.chip[data-s="critico"] { background: var(--cri-chip); color: var(--cri-txt); }
+.chip[data-s="nd"]      { background: var(--neu-chip); color: var(--neu-txt); }
+
+.heroi { display: flex; align-items: baseline; gap: 0.75cqw; margin-bottom: 0.85cqw; }
+.heroi .grande { font-size: 2cqw; font-weight: 700; letter-spacing: -.03em; line-height: 1; color: var(--verde-escuro); }
+.heroi .grande small { font-size: 0.9cqw; font-weight: 600; color: var(--tinta-3); margin-left: 0.1cqw; }
+.heroi .lado {
+  font-size: 0.9cqw; font-weight: 700; color: var(--tinta);
+  padding-left: 0.7cqw; border-left: 1px solid var(--fio); font-variant-numeric: tabular-nums;
+}
+.heroi .lado span { font-size: 0.66cqw; font-weight: 500; color: var(--tinta-3); margin-left: 0.25cqw; }
+
+.analises { display: grid; flex: 1; grid-auto-rows: 1fr; align-content: stretch; }
+.analises > div {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 0.7cqw; align-items: center;
+  padding: 0.35cqw 0; border-top: 1px solid var(--fio); min-height: 1.9cqw;
+}
+.analises dt { font-size: 0.75cqw; color: var(--tinta-3); white-space: nowrap; }
+.analises .base { font-size: 0.75cqw; color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+.analises .var {
+  font-size: 0.75cqw; font-weight: 700; font-variant-numeric: tabular-nums;
+  white-space: nowrap; min-width: 3.6cqw; text-align: right;
+}
+.var[data-s="bom"]    { color: var(--bom-txt); }
+.var[data-s="ruim"]   { color: var(--cri-txt); }
+.var[data-s="neutro"] { color: var(--tinta-3); }
+.falta {
+  font-size: 0.62cqw; color: var(--tinta-3);
+  border: 1px dashed var(--fio-forte); border-radius: 0.25cqw; padding: 0 0.35cqw; white-space: nowrap;
+}
+
+.tendencia { margin: 0.7cqw -0.95cqw 0; border-top: 1px solid var(--fio); }
+.tendencia svg { display: block; width: 100%; height: 2.6cqw; }
+.tendencia.vazia { height: 2.7cqw; display: flex; align-items: center; justify-content: center; }
+.tendencia.vazia span { font-size: 0.62cqw; color: var(--tinta-3); }
+
+/* --- listas --- */
+.duplo { display: grid; grid-template-columns: 1fr 1fr; gap: 1cqw; }
+.mini {
+  font-size: 0.62cqw; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--tinta-3); margin-bottom: 0.5cqw; display: block; white-space: nowrap;
+}
+.rank { display: grid; gap: 0.45cqw; }
+.rank li { display: grid; grid-template-columns: 1fr auto; gap: 0.5cqw; align-items: baseline; font-size: 0.75cqw; }
+.rank .nome { color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank .val { color: var(--tinta); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank .barra { grid-column: 1 / -1; height: 0.15cqw; border-radius: 0.1cqw; background: var(--fio); overflow: hidden; }
+.rank .barra i { display: block; height: 100%; background: var(--cor, var(--verde-claro)); }
+
+table.dir { width: 100%; border-collapse: collapse; font-size: 0.75cqw; }
+table.dir th {
+  text-align: right; font-size: 0.62cqw; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--tinta-3); font-weight: 700; padding: 0 0 0.4cqw;
+}
+table.dir th:first-child, table.dir td:first-child { text-align: left; }
+table.dir td { text-align: right; padding: 0.35cqw 0; border-top: 1px solid var(--fio); font-variant-numeric: tabular-nums; color: var(--tinta-2); }
+table.dir td:first-child { color: var(--tinta); font-weight: 700; }
+table.dir td.forte { color: var(--tinta); font-weight: 700; }
+
+.nota { margin-top: auto; padding-top: 0.6cqw; font-size: 0.62cqw; line-height: 1.5; color: var(--tinta-3); }
+.nota b { color: var(--atn-txt); font-weight: 700; }
+
+.insight {
+  background: var(--cartao); border: 1px solid var(--fio); border-left: 0.2cqw solid var(--verde);
+  border-radius: 0.5cqw; padding: 0.7cqw 0.95cqw;
+}
+.insight p { font-size: 0.75cqw; line-height: 1.55; color: var(--tinta-2); }
+.procedencia {
+  display: inline-block; margin-right: 0.5cqw; padding: 0.1cqw 0.45cqw; border-radius: 0.25cqw;
+  background: var(--atn-chip); color: var(--atn-txt); font-size: 0.62cqw; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; vertical-align: 0.1cqw;
+}
+.insight strong { color: var(--tinta); font-weight: 700; }
+
+/* texto editável: afordância discreta, só na intenção */
+[contenteditable="true"]:hover { outline: 1px dashed var(--fio-forte); outline-offset: 0.2cqw; border-radius: 2px; }
+
+/* ====================== celular: empilha, sem 16:9 ======================= */
+@media (max-width: 900px) {
+  .slide {
+    aspect-ratio: auto; max-width: none; container-type: normal;
+    padding: 14px; gap: 10px; border: 0;
+  }
+  .slide, .slide * { font-size: revert; }
+  .cabecalho h1 { font-size: 17px; } .cabecalho .sub { font-size: 12px; }
+  .cabecalho .selo { font-size: 10px; padding: 3px 8px; }
+  .logo, .logo-vazio { height: 28px; width: auto; }
+  .logo-vazio { width: 74px; font-size: 8px; }
+  .filtros { flex-wrap: wrap; padding: 8px; border-radius: 8px; }
+  .campo, .campo select, .janela button, .limpar, .regua { font-size: 12px; }
+  .campo select { padding: 5px 8px; border-radius: 6px; max-width: 46vw; }
+  .janela button { padding: 5px 11px; border-radius: 6px; }
+  .filtros { gap: 8px; }
+  .procedencia { font-size: 10px; margin-right: 6px; padding: 2px 6px; border-radius: 4px; }
+  .linha { gap: 10px; }
+  .linha-a, .linha-b { flex: none; }
+  .analises { flex: none; grid-auto-rows: auto; }
+  .analises > div { min-height: 0; }
+  .linha-a, .linha-b { grid-template-columns: minmax(0, 1fr); }
+  .duplo { grid-template-columns: minmax(0, 1fr); }
+  .cartao { padding: 14px 14px 0; border-radius: 10px; }
+  .cartao::before { width: 3px; }
+  .cartao.sem-grafico { padding-bottom: 14px; }
+  .cartao h3 { font-size: 14px; } .chip { font-size: 10.5px; padding: 3px 8px; }
+  .heroi .grande { font-size: 30px; } .heroi .grande small, .heroi .lado { font-size: 14px; }
+  .heroi .lado span { font-size: 10.5px; }
+  .analises dt, .analises .base, .analises .var { font-size: 12px; }
+  .analises > div { padding: 6px 0; gap: 10px; }
+  .falta, .mini, .nota, .tendencia.vazia span, table.dir th { font-size: 10.5px; }
+  .rank li, table.dir, .insight p { font-size: 12px; }
+  .rank .barra { height: 2px; }
+  .tendencia { margin: 10px -14px 0; } .tendencia svg, .tendencia.vazia { height: 40px; }
+  .insight { padding: 12px 14px; border-left-width: 3px; border-radius: 10px; }
+}
+
+/* ====================== impressão: só o slide ============================ */
+@media print {
+  body { background: #fff; }
+  .ferramentas, .painel-dados { display: none !important; }
+  .slide { border: 0; max-width: none; width: 100%; }
+  @page { size: landscape; margin: 8mm; }
+}
+</style>
+</head>
+<body>
+
+<div class="ferramentas">
+  <span class="marca">Painel de movimentações</span>
+  <button class="btn" id="btn-dados" type="button" aria-expanded="false" aria-controls="painel-dados">Atualizar dados</button>
+  <label class="btn" for="arq-logo">Trocar logo</label>
+  <input type="file" id="arq-logo" accept="image/png,image/jpeg,image/svg+xml" hidden>
+  <button class="btn" id="btn-imprimir" type="button">Imprimir / PDF</button>
+  <button class="btn primario" id="btn-salvar" type="button">Salvar semana</button>
+</div>
+
+<section class="painel-dados" id="painel-dados" hidden>
+  <h2>Carregar a base</h2>
+  <p>
+    Clique em <b>Escolher arquivo</b> e aponte para <b>base-movimentacoes.xlsx</b>. O painel lê as abas
+    <b>Config</b>, <b>Fatos</b>, <b>Motivos</b> e <b>Textos</b>, e passa a agregar conforme o filtro.<br>
+    Depois use <b>Salvar semana</b>: o arquivo gerado leva a base inteira dentro, então os filtros continuam
+    funcionando para quem abrir na pasta de rede.
+  </p>
+  <div class="painel-acoes" style="margin:0">
+    <label class="btn primario" for="arq-base">Escolher arquivo (.xlsx)</label>
+    <input type="file" id="arq-base" accept=".xlsx" hidden>
+    <span class="aviso" id="aviso"></span>
+  </div>
+  <p id="resumo-base" class="resumo-base"></p>
+</section>
+
+<main class="slide" id="slide">
+
+  <header class="cabecalho">
+    <img class="logo" id="logo" alt="Logo da empresa" hidden>
+    <div class="logo-vazio" id="logo-vazio">LOGO</div>
+    <div class="divisor"></div>
+    <div>
+      <h1 id="titulo">Movimentações</h1>
+      <p class="sub" id="subtitulo"></p>
+    </div>
+    <span class="selo" id="selo" hidden></span>
+  </header>
+
+  <div class="filtros">
+    <label class="campo"><span>Empresa</span><select id="f-empresa"></select></label>
+    <label class="campo"><span>Diretoria</span><select id="f-diretoria"></select></label>
+    <label class="campo"><span>Área</span><select id="f-area"></select></label>
+    <div class="janela" role="group" aria-label="Janela de leitura">
+      <button type="button" data-j="semana">Semana</button>
+      <button type="button" data-j="mes">Mês</button>
+      <button type="button" data-j="ano">Ano</button>
+    </div>
+    <button type="button" class="limpar" id="btn-limpar" hidden>Limpar filtro</button>
+    <span class="regua" id="regua"></span>
+  </div>
+
+  <div class="linha linha-a" id="linha-kpi"></div>
+  <div class="linha linha-b" id="linha-perfil"></div>
+
+  <div class="insight">
+    <p id="insight" contenteditable="true" role="textbox" aria-multiline="true"></p>
+  </div>
+</main>
+
+<!-- ======= base por segmento: é este bloco que o "Salvar semana" reescreve ======= -->
+<script id="base" type="application/json">{"config":{"titulo":"Movimentações","periodo_atual":"2026-07","semana_atual":"2026-07-S3","periodo_rotulo":"Julho 2026","semana_rotulo":"Semana 3","regua":"MTD com 3 de 4,4 semanas","janela_padrao":"mes","dados_exemplo":"sim","logo":""},"fatos":[{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-01","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":23,"desl_vol":23,"desl_inv":10,"desl_lideres":2,"desl_ate1ano":12},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-01","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":12,"desl_vol":11,"desl_inv":5,"desl_lideres":1,"desl_ate1ano":5},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-01","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":10,"desl_vol":4,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-01","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":4,"desl_vol":2,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-01","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":8,"desl_vol":6,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-01","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":7,"desl_vol":2,"desl_inv":2,"desl_lideres":2,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-01","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":5,"desl_vol":3,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-02","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":31,"desl_vol":30,"desl_inv":14,"desl_lideres":4,"desl_ate1ano":16},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-02","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":15,"desl_vol":14,"desl_inv":6,"desl_lideres":1,"desl_ate1ano":7},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-02","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":13,"desl_vol":5,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-02","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":3,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-02","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":11,"desl_vol":8,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-02","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":9,"desl_vol":3,"desl_inv":3,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-02","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":4,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-03","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":45,"desl_vol":45,"desl_inv":21,"desl_lideres":5,"desl_ate1ano":23},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-03","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":23,"desl_vol":20,"desl_inv":9,"desl_lideres":2,"desl_ate1ano":11},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-03","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":19,"desl_vol":8,"desl_inv":4,"desl_lideres":1,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-03","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":9,"desl_vol":4,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-03","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":16,"desl_vol":12,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-03","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":14,"desl_vol":4,"desl_inv":4,"desl_lideres":5,"desl_ate1ano":3},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-03","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":9,"desl_vol":6,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-04","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":41,"desl_vol":40,"desl_inv":18,"desl_lideres":4,"desl_ate1ano":21},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-04","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":21,"desl_vol":18,"desl_inv":8,"desl_lideres":2,"desl_ate1ano":9},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-04","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":17,"desl_vol":7,"desl_inv":4,"desl_lideres":2,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-04","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":8,"desl_vol":4,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-04","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":14,"desl_vol":11,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-04","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":13,"desl_vol":4,"desl_inv":4,"desl_lideres":4,"desl_ate1ano":3},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-04","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":8,"desl_vol":5,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-05","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":38,"desl_vol":37,"desl_inv":17,"desl_lideres":4,"desl_ate1ano":19},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-05","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":19,"desl_vol":17,"desl_inv":8,"desl_lideres":2,"desl_ate1ano":9},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-05","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":16,"desl_vol":7,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-05","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":7,"desl_vol":4,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-05","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":13,"desl_vol":10,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-05","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":12,"desl_vol":3,"desl_inv":3,"desl_lideres":4,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-05","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":8,"desl_vol":5,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-06","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":31,"desl_vol":30,"desl_inv":14,"desl_lideres":4,"desl_ate1ano":16},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-06","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":16,"desl_vol":14,"desl_inv":7,"desl_lideres":1,"desl_ate1ano":7},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-06","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":13,"desl_vol":6,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-06","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":3,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-06","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":11,"desl_vol":8,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-06","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":10,"desl_vol":3,"desl_inv":3,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-06","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":4,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-07","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":30,"desl_vol":30,"desl_inv":14,"desl_lideres":4,"desl_ate1ano":15},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-07","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":15,"desl_vol":13,"desl_inv":6,"desl_lideres":1,"desl_ate1ano":7},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-07","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":13,"desl_vol":5,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-07","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":3,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-07","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":11,"desl_vol":8,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-07","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":9,"desl_vol":3,"desl_inv":3,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-07","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":4,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-08","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":28,"desl_vol":27,"desl_inv":13,"desl_lideres":3,"desl_ate1ano":14},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-08","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":14,"desl_vol":12,"desl_inv":6,"desl_lideres":1,"desl_ate1ano":6},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-08","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":12,"desl_vol":5,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-08","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":5,"desl_vol":3,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-08","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":9,"desl_vol":7,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-08","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":9,"desl_vol":2,"desl_inv":2,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-08","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":4,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-09","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":34,"desl_vol":33,"desl_inv":15,"desl_lideres":4,"desl_ate1ano":17},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-09","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":17,"desl_vol":15,"desl_inv":7,"desl_lideres":1,"desl_ate1ano":8},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-09","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":14,"desl_vol":6,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-09","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":3,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-09","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":12,"desl_vol":9,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-09","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":10,"desl_vol":3,"desl_inv":3,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-09","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":7,"desl_vol":4,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-10","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":28,"desl_vol":27,"desl_inv":13,"desl_lideres":3,"desl_ate1ano":14},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-10","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":14,"desl_vol":12,"desl_inv":6,"desl_lideres":1,"desl_ate1ano":6},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-10","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":12,"desl_vol":5,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-10","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":5,"desl_vol":3,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-10","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":9,"desl_vol":7,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-10","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":9,"desl_vol":2,"desl_inv":2,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-10","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":4,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-11","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":32,"desl_vol":31,"desl_inv":14,"desl_lideres":4,"desl_ate1ano":16},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-11","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":16,"desl_vol":14,"desl_inv":7,"desl_lideres":1,"desl_ate1ano":8},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-11","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":13,"desl_vol":6,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-11","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":3,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-11","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":11,"desl_vol":8,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-11","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":10,"desl_vol":3,"desl_inv":3,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-11","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":4,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2025-12","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":42,"desl_vol":41,"desl_inv":19,"desl_lideres":4,"desl_ate1ano":21},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2025-12","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":21,"desl_vol":19,"desl_inv":8,"desl_lideres":2,"desl_ate1ano":10},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2025-12","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":17,"desl_vol":7,"desl_inv":4,"desl_lideres":2,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2025-12","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":8,"desl_vol":4,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2025-12","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":14,"desl_vol":11,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2025-12","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":13,"desl_vol":4,"desl_inv":4,"desl_lideres":4,"desl_ate1ano":3},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2025-12","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":9,"desl_vol":5,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-01","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":25,"desl_vol":31,"desl_inv":12,"desl_lideres":3,"desl_ate1ano":15},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-01","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":12,"desl_vol":14,"desl_inv":5,"desl_lideres":1,"desl_ate1ano":7},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-01","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":10,"desl_vol":6,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-01","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":5,"desl_vol":3,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-01","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":9,"desl_vol":8,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-01","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":8,"desl_vol":3,"desl_inv":2,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-01","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":5,"desl_vol":4,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-02","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":32,"desl_vol":28,"desl_inv":40,"desl_lideres":5,"desl_ate1ano":23},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-02","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":16,"desl_vol":13,"desl_inv":18,"desl_lideres":2,"desl_ate1ano":11},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-02","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":14,"desl_vol":5,"desl_inv":8,"desl_lideres":2,"desl_ate1ano":5},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-02","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":3,"desl_inv":4,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-02","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":11,"desl_vol":8,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-02","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":10,"desl_vol":2,"desl_inv":8,"desl_lideres":5,"desl_ate1ano":3},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-02","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":7,"desl_vol":4,"desl_inv":4,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-03","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":30,"desl_vol":37,"desl_inv":16,"desl_lideres":4,"desl_ate1ano":18},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-03","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":15,"desl_vol":17,"desl_inv":7,"desl_lideres":2,"desl_ate1ano":9},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-03","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":12,"desl_vol":7,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-03","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":3,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-03","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":10,"desl_vol":10,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-03","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":9,"desl_vol":3,"desl_inv":3,"desl_lideres":4,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-03","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":5,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-04","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":31,"desl_vol":37,"desl_inv":18,"desl_lideres":4,"desl_ate1ano":19},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-04","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":15,"desl_vol":17,"desl_inv":8,"desl_lideres":2,"desl_ate1ano":9},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-04","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":13,"desl_vol":7,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-04","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":3,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-04","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":11,"desl_vol":10,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-04","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":9,"desl_vol":3,"desl_inv":3,"desl_lideres":4,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-04","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":5,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-05","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":28,"desl_vol":35,"desl_inv":18,"desl_lideres":4,"desl_ate1ano":18},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-05","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":14,"desl_vol":16,"desl_inv":8,"desl_lideres":2,"desl_ate1ano":9},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-05","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":12,"desl_vol":6,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-05","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":5,"desl_vol":3,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-05","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":10,"desl_vol":10,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-05","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":9,"desl_vol":3,"desl_inv":3,"desl_lideres":4,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-05","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":5,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-06","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":29,"desl_vol":35,"desl_inv":22,"desl_lideres":4,"desl_ate1ano":20},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-06","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":14,"desl_vol":16,"desl_inv":10,"desl_lideres":2,"desl_ate1ano":9},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-06","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":12,"desl_vol":6,"desl_inv":4,"desl_lideres":1,"desl_ate1ano":4},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-06","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":5,"desl_vol":3,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-06","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":10,"desl_vol":10,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-06","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":9,"desl_vol":3,"desl_inv":4,"desl_lideres":4,"desl_ate1ano":3},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-06","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":6,"desl_vol":5,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":26,"desl_vol":22,"desl_inv":20,"desl_lideres":3,"desl_ate1ano":15},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":14,"desl_vol":10,"desl_inv":9,"desl_lideres":1,"desl_ate1ano":7},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":12,"desl_vol":4,"desl_inv":4,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-07","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":6,"desl_vol":2,"desl_inv":2,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-07","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":8,"desl_vol":6,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":8,"desl_vol":2,"desl_inv":4,"desl_lideres":3,"desl_ate1ano":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-07","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":4,"desl_vol":3,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07-S1","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":9,"desl_vol":8,"desl_inv":7,"desl_lideres":1,"desl_ate1ano":6},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07-S1","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":5,"desl_vol":4,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07-S1","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":4,"desl_vol":2,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-07-S1","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":2,"desl_vol":1,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":0},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-07-S1","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":3,"desl_vol":2,"desl_inv":0,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07-S1","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":3,"desl_vol":1,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":1},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-07-S1","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":2,"desl_vol":1,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07-S2","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":11,"desl_vol":10,"desl_inv":8,"desl_lideres":1,"desl_ate1ano":7},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07-S2","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":6,"desl_vol":5,"desl_inv":3,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07-S2","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":5,"desl_vol":2,"desl_inv":2,"desl_lideres":1,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-07-S2","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":2,"desl_vol":1,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":0},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-07-S2","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":4,"desl_vol":3,"desl_inv":0,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07-S2","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":3,"desl_vol":1,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":1},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-07-S2","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":2,"desl_vol":1,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07-S3","hc":1800,"hc_lideres":105,"hc_ate1ano":330,"admitidos":5,"desl_vol":3,"desl_inv":6,"desl_lideres":1,"desl_ate1ano":3},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07-S3","hc":900,"hc_lideres":57,"hc_ate1ano":160,"admitidos":3,"desl_vol":2,"desl_inv":3,"desl_lideres":0,"desl_ate1ano":2},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07-S3","hc":750,"hc_lideres":46,"hc_ate1ano":135,"admitidos":2,"desl_vol":1,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-07-S3","hc":350,"hc_lideres":24,"hc_ate1ano":60,"admitidos":1,"desl_vol":0,"desl_inv":1,"desl_lideres":0,"desl_ate1ano":0},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-07-S3","hc":620,"hc_lideres":38,"hc_ate1ano":105,"admitidos":2,"desl_vol":1,"desl_inv":0,"desl_lideres":0,"desl_ate1ano":1},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07-S3","hc":560,"hc_lideres":34,"hc_ate1ano":100,"admitidos":2,"desl_vol":0,"desl_inv":1,"desl_lideres":1,"desl_ate1ano":0},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-07-S3","hc":368,"hc_lideres":25,"hc_ate1ano":73,"admitidos":1,"desl_vol":0,"desl_inv":0,"desl_lideres":0,"desl_ate1ano":0}],"motivos":[{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Voluntário","motivo":"Particular","qtd":18},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Voluntário","motivo":"Particular","qtd":8},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07","familia":"Voluntário","motivo":"Particular","qtd":3},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-07","familia":"Voluntário","motivo":"Particular","qtd":2},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-07","familia":"Voluntário","motivo":"Particular","qtd":5},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07","familia":"Voluntário","motivo":"Particular","qtd":2},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-07","familia":"Voluntário","motivo":"Particular","qtd":2},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Voluntário","motivo":"Proposta externa","qtd":2},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Voluntário","motivo":"Proposta externa","qtd":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-07","familia":"Voluntário","motivo":"Proposta externa","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Voluntário","motivo":"Mudança de cidade","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Voluntário","motivo":"Mudança de cidade","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Voluntário","motivo":"Outros","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Voluntário","motivo":"Outros","qtd":1},{"empresa":"Operações","diretoria":"TRP","area":"Frota","periodo":"2026-07","familia":"Voluntário","motivo":"Outros","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Involuntário","motivo":"Performance","qtd":8},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Involuntário","motivo":"Performance","qtd":3},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07","familia":"Involuntário","motivo":"Performance","qtd":2},{"empresa":"Operações","diretoria":"IND","area":"Manutenção","periodo":"2026-07","familia":"Involuntário","motivo":"Performance","qtd":1},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07","familia":"Involuntário","motivo":"Performance","qtd":1},{"empresa":"Corporativo","diretoria":"CORP","area":"Administrativo","periodo":"2026-07","familia":"Involuntário","motivo":"Performance","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Involuntário","motivo":"Cultura organizacional","qtd":3},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Involuntário","motivo":"Cultura organizacional","qtd":2},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07","familia":"Involuntário","motivo":"Cultura organizacional","qtd":1},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07","familia":"Involuntário","motivo":"Cultura organizacional","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Involuntário","motivo":"Redução de quadro","qtd":3},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Involuntário","motivo":"Redução de quadro","qtd":2},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07","familia":"Involuntário","motivo":"Redução de quadro","qtd":1},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07","familia":"Involuntário","motivo":"Redução de quadro","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Involuntário","motivo":"Excesso de faltas","qtd":3},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Involuntário","motivo":"Excesso de faltas","qtd":1},{"empresa":"Operações","diretoria":"IND","area":"Produção","periodo":"2026-07","familia":"Involuntário","motivo":"Excesso de faltas","qtd":1},{"empresa":"Operações","diretoria":"LOG","area":"Expedição","periodo":"2026-07","familia":"Involuntário","motivo":"Excesso de faltas","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Involuntário","motivo":"Violação de procedimentos","qtd":2},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Involuntário","motivo":"Violação de procedimentos","qtd":1},{"empresa":"Operações","diretoria":"FLO","area":"Colheita","periodo":"2026-07","familia":"Involuntário","motivo":"Reestruturação de área","qtd":2},{"empresa":"Operações","diretoria":"FLO","area":"Silvicultura","periodo":"2026-07","familia":"Involuntário","motivo":"Reestruturação de área","qtd":1}],"textos":{"insight":"**Julho:** volume desacelera 26% vs junho, puxado pelo voluntário (−37%). **Atenção no involuntário** — igual à média de 2026, mas **+28% acima da média de 2025**. **Alerta nos líderes:** 9 saídas contra 4 em junho.","nota_motivos":"**“Particular” = 82% dos pedidos de demissão.** O motivo mais frequente é “não sabemos”: achado de codificação, não de visualização.","nota_diretorias":"**Índice acima de 1,0× indica sobre-representação:** a área perde mais gente do que o seu tamanho justificaria."}}</script>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   MOTOR DE AGREGAÇÃO
+   --------------------------------------------------------------------------
+   A base traz componentes brutos por segmento e por período. O painel filtra,
+   soma e só então divide. É o que impede a média de médias: taxa não soma
+   entre áreas, mas numerador e denominador somam.
+
+   Fluxo (admitidos, desligamentos) soma ao longo do tempo.
+   Estoque (headcount) é foto: soma entre segmentos, mas tira média no tempo.
+   ========================================================================== */
+
+let BASE = JSON.parse(document.getElementById("base").textContent);
+const estado = { empresa: "", diretoria: "", area: "", janela: "mes" };
+
+/* ---------------- formatação ---------------- */
+const nf = (c) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: c, maximumFractionDigits: c });
+const N0 = nf(0), N1 = nf(1), N2 = nf(2);
+const vazio = (v) => v === null || v === undefined || v === "" || Number.isNaN(v);
+const num = (v) => (vazio(v) ? null : Number.isInteger(v) ? N0.format(v) : N1.format(v));
+
+const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const MES_LONGO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const rotuloMes = (p, longo) => {
+  const [a, m] = p.split("-");
+  return (longo ? MES_LONGO[+m - 1] : MES_CURTO[+m - 1]) + (longo ? " de " + a : "/" + a.slice(2));
+};
+
+function textoRico(s) {
+  return String(s == null ? "" : s)
+    .replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+}
+
+/* ---------------- períodos ---------------- */
+const ehMes = (p) => /^\d{4}-\d{2}$/.test(p);
+const ehSemana = (p) => /-S\d+$/.test(p);
+
+let PERIODOS = [], MES_REF = "", ANO = 0, SEMANA_REF = "";
+
+function indexarPeriodos() {
+  PERIODOS = [...new Set(BASE.fatos.map((f) => f.periodo))].sort();
+  MES_REF = BASE.config.periodo_atual;
+  SEMANA_REF = BASE.config.semana_atual || "";
+  ANO = Number(MES_REF.slice(0, 4));
+}
+const mesesDe = (ano) => PERIODOS.filter((p) => ehMes(p) && p.startsWith(ano + "-"));
+const semanasDe = (mes) => PERIODOS.filter((p) => p.startsWith(mes + "-S"));
+const anterior = (lista, atual) => { const i = lista.indexOf(atual); return i > 0 ? lista[i - 1] : null; };
+
+/* ---------------- agregação ---------------- */
+const casa = (f) =>
+  (!estado.empresa || f.empresa === estado.empresa) &&
+  (!estado.diretoria || f.diretoria === estado.diretoria) &&
+  (!estado.area || f.area === estado.area);
+
+const FLUXOS = ["admitidos", "desl_vol", "desl_inv", "desl_lideres", "desl_ate1ano"];
+const ESTOQUES = ["hc", "hc_lideres", "hc_ate1ano"];
+
+/**
+ * Agrega os fatos de uma lista de períodos.
+ * modo "soma"  devolve o total do intervalo (uso: mês, acumulado).
+ * modo "media" devolve a média por período (uso: média mensal do ano).
+ * Em ambos, estoque é sempre média no tempo — headcount não se acumula.
+ */
+function agregar(periodos, modo) {
+  if (!periodos || !periodos.length) return null;
+  const alvo = new Set(periodos);
+  const porPeriodo = new Map();
+
+  for (const f of BASE.fatos) {
+    if (!alvo.has(f.periodo) || !casa(f)) continue;
+    let a = porPeriodo.get(f.periodo);
+    if (!a) { a = {}; for (const k of [...FLUXOS, ...ESTOQUES]) a[k] = 0; porPeriodo.set(f.periodo, a); }
+    for (const k of [...FLUXOS, ...ESTOQUES]) a[k] += Number(f[k]) || 0;
+  }
+  if (!porPeriodo.size) return null;
+
+  const n = porPeriodo.size;
+  const r = { n };
+  for (const k of FLUXOS) {
+    let s = 0;
+    for (const a of porPeriodo.values()) s += a[k];
+    r[k] = modo === "media" ? s / n : s;
+  }
+  for (const k of ESTOQUES) {
+    let s = 0;
+    for (const a of porPeriodo.values()) s += a[k];
+    r[k] = s / n;                       // estoque: média no tempo, sempre
+  }
+  r.desl_total = r.desl_vol + r.desl_inv;
+  return r;
+}
+
+/* ---------------- variação e farol ---------------- */
+function variacao(valor, base, direcao) {
+  if (vazio(valor) || vazio(base) || base === 0) return null;
+  const dif = valor - base;
+  const magnitude = N1.format(Math.abs(dif / base) * 100);
+  const nulo = Number(magnitude.replace(",", ".")) === 0;
+  let sentido = "neutro";
+  if (!nulo && direcao === "menor") sentido = dif < 0 ? "bom" : "ruim";
+  if (!nulo && direcao === "maior") sentido = dif > 0 ? "bom" : "ruim";
+  return { sentido, ruim: sentido === "ruim", texto: nulo ? "estável" : (dif > 0 ? "▲ " : "▼ ") + magnitude + "%" };
+}
+
+const ROTULO = { bom: "Melhorou", atencao: "Atenção", critico: "Piorou", nd: "Sem direção" };
+
+/** Conta as comparações disponíveis que estão piores. Ver Instruções da base. */
+function farol(variacoes, direcao) {
+  if (!direcao) return "nd";
+  const validas = variacoes.filter(Boolean);
+  if (!validas.length) return "nd";
+  const piores = validas.filter((v) => v.ruim).length;
+  if (piores === 0) return "bom";
+  return piores / validas.length > 0.5 ? "critico" : "atencao";
+}
+
+/* ---------------- janelas de leitura ---------------- */
+function janelaAtiva() {
+  const mesesAno = mesesDe(ANO);
+  const fechados = mesesAno.filter((p) => p < MES_REF);
+  const mesAnt = anterior(mesesAno, MES_REF);
+  const mm = MES_REF.slice(5);
+  const anoAnt = mesesDe(ANO - 1);
+  const anoAntAteMes = anoAnt.filter((p) => p.slice(5) <= mm);
+  const semanas = semanasDe(MES_REF);
+  const semAnt = anterior(semanas, SEMANA_REF);
+
+  if (estado.janela === "ano") {
+    return {
+      titulo: `Acumulado ${ANO}`,
+      atual: { periodos: mesesAno, modo: "soma" },
+      linhas: [
+        { rot: `jan–${MES_CURTO[+mm - 1]} ${ANO - 1}`, periodos: anoAntAteMes, modo: "soma", comparar: true },
+        { rot: `Média/mês ${ANO}`, periodos: mesesAno, modo: "media" },
+        { rot: `${ANO - 1} fechado`, periodos: anoAnt, modo: "soma" },
+      ],
+    };
+  }
+  if (estado.janela === "semana") {
+    return {
+      titulo: BASE.config.semana_rotulo || "Semana",
+      atual: { periodos: SEMANA_REF ? [SEMANA_REF] : [], modo: "soma" },
+      linhas: [
+        { rot: "Semana anterior", periodos: semAnt ? [semAnt] : [], modo: "soma", comparar: true },
+        { rot: `Média/sem em ${rotuloMes(MES_REF)}`, periodos: semanas, modo: "media", comparar: true },
+        { rot: `Semana em ${ANO - 1}`, periodos: [], modo: "soma", comparar: true },
+      ],
+    };
+  }
+  return {
+    titulo: rotuloMes(MES_REF, true),
+    atual: { periodos: [MES_REF], modo: "soma" },
+    linhas: [
+      { rot: BASE.config.semana_rotulo || "Semana", periodos: SEMANA_REF ? [SEMANA_REF] : [], modo: "soma", taxa: true },
+      { rot: mesAnt ? rotuloMes(mesAnt, true).replace(/ de \d{4}/, "") : "Mês anterior", periodos: mesAnt ? [mesAnt] : [], modo: "soma", comparar: true },
+      { rot: `Média/mês ${ANO}`, periodos: fechados, modo: "media", comparar: true },
+      { rot: `Média/mês ${ANO - 1}`, periodos: anoAnt, modo: "media", comparar: true },
+    ],
+  };
+}
+
+/* ---------------- definição dos indicadores ---------------- */
+const KPIS = [
+  { id: "turnover", titulo: "Turnover geral", valor: (a) => a.desl_total, unidade: "saídas", direcao: "menor" },
+  { id: "voluntario", titulo: "Voluntários", valor: (a) => a.desl_vol, unidade: "saídas", direcao: "menor" },
+  { id: "involuntario", titulo: "Involuntários", valor: (a) => a.desl_inv, unidade: "saídas", direcao: "menor" },
+  { id: "admitidos", titulo: "Admitidos", valor: (a) => a.admitidos, unidade: "entradas", direcao: "" },
+];
+const PERFIS = [
+  { id: "lideres", titulo: "Líderes desligados", valor: (a) => a.desl_lideres, base: (a) => a.hc_lideres,
+    rotuloTaxa: "Taxa sobre líderes", direcao: "menor" },
+  { id: "ate1ano", titulo: "Até 1 ano", valor: (a) => a.desl_ate1ano, base: (a) => a.hc_ate1ano,
+    rotuloTaxa: "Taxa sobre quem tem < 1 ano", direcao: "menor" },
+];
+
+/* ==========================================================================
+   Desenho
+   ========================================================================== */
+let faltantes = 0;
+
+function linhaAnalise(rot, base, v, direita) {
+  if (vazio(base) && !v && direita === undefined) {
+    faltantes++;
+    return `<div><dt>${rot}</dt><dd class="base"></dd><dd><span class="falta">sem dado</span></dd></div>`;
+  }
+  const ref = vazio(base) ? `<dd class="base"></dd>` : `<dd class="base">${num(base)}</dd>`;
+  const dir = direita !== undefined
+    ? `<dd class="var" data-s="neutro">${direita}</dd>`
+    : v ? `<dd class="var" data-s="${v.sentido}">${v.texto}</dd>` : `<dd class="var" data-s="neutro">—</dd>`;
+  return `<div><dt>${rot}</dt>${ref}${dir}</div>`;
+}
+
+const COR = { bom: "var(--bom-marca)", atencao: "var(--atn-marca)", critico: "var(--cri-marca)", nd: "var(--neu-marca)" };
+
+function sparkline(serie, estadoFarol) {
+  const s = serie.filter((v) => !vazio(v));
+  if (s.length < 2) return `<div class="tendencia vazia"><span>série mensal sem dado</span></div>`;
+  const min = Math.min(...s), max = Math.max(...s), amp = max - min || 1;
+  const pts = s.map((v, i) => `${((i * 300) / (s.length - 1)).toFixed(0)} ${(34 - ((v - min) / amp) * 26).toFixed(1)}`);
+  const d = "M" + pts.join(" L");
+  const cor = COR[estadoFarol] || COR.nd;
+  return `<div class="tendencia">
+    <svg viewBox="0 0 300 42" preserveAspectRatio="none" role="img" aria-label="Tendência mensal: ${s.join(", ")}">
+      <path d="${d} L300 42 L0 42 Z" fill="${cor}" opacity=".1"/>
+      <path d="${d}" fill="none" stroke="${cor}" stroke-width="1.5" stroke-linejoin="round" opacity=".85" vector-effect="non-scaling-stroke"/>
+    </svg></div>`;
+}
+
+function cartaoKpi(kpi, janela) {
+  const aAtual = agregar(janela.atual.periodos, janela.atual.modo);
+  const valor = aAtual ? kpi.valor(aAtual) : null;
+  const taxa = aAtual && aAtual.hc ? (valor / aAtual.hc) * 100 : null;
+
+  const linhas = [], vars = [];
+  for (const l of janela.linhas) {
+    const a = agregar(l.periodos, l.modo);
+    const v = a ? kpi.valor(a) : null;
+    if (l.taxa) {                                    // linha informativa com taxa
+      const t = a && a.hc ? (v / a.hc) * 100 : null;
+      linhas.push(linhaAnalise(l.rot, v, null, vazio(t) ? undefined : N2.format(t) + "%"));
+    } else if (l.comparar) {
+      const c = variacao(valor, v, kpi.direcao);
+      if (c) vars.push(c);
+      linhas.push(linhaAnalise(l.rot, v, c));
+    } else {
+      linhas.push(linhaAnalise(l.rot, v, null, ""));
+    }
+  }
+  const est = farol(vars, kpi.direcao);
+
+  const serie = mesesDe(ANO).map((p) => { const a = agregar([p], "soma"); return a ? kpi.valor(a) : null; });
+
+  return `<article class="cartao" data-s="${est}" data-kpi="${kpi.id}">
+    <div class="cartao-topo"><h3>${kpi.titulo}</h3><span class="chip" data-s="${est}">${ROTULO[est]}</span></div>
+    <div class="heroi">
+      <span class="grande">${vazio(taxa) ? (vazio(valor) ? "—" : N0.format(valor)) : N2.format(taxa) + "<small>%</small>"}</span>
+      <span class="lado">${vazio(valor) ? "—" : N0.format(valor)}<span>${kpi.unidade}</span></span>
+    </div>
+    <dl class="analises">${linhas.join("")}</dl>
+    ${sparkline(serie, est)}
+  </article>`;
+}
+
+function cartaoPerfil(p, janela) {
+  const aAtual = agregar(janela.atual.periodos, janela.atual.modo);
+  const valor = aAtual ? p.valor(aAtual) : null;
+  const saidas = aAtual ? aAtual.desl_total : null;
+  const pct = !vazio(valor) && saidas ? (valor / saidas) * 100 : null;
+  const incid = aAtual && p.base(aAtual) ? (valor / p.base(aAtual)) * 100 : null;
+
+  const linhas = [linhaAnalise(p.rotuloTaxa, null, null, vazio(incid) ? undefined : N2.format(incid) + "%")];
+  const vars = [];
+  for (const l of janela.linhas) {
+    if (l.taxa) continue;                             // perfil não tem linha de semana com taxa
+    const a = agregar(l.periodos, l.modo);
+    const v = a ? p.valor(a) : null;
+    if (l.comparar) {
+      const c = variacao(valor, v, p.direcao);
+      if (c) vars.push(c);
+      linhas.push(linhaAnalise(l.rot, v, c));
+    } else {
+      linhas.push(linhaAnalise(l.rot, v, null, ""));
+    }
+  }
+  const est = farol(vars, p.direcao);
+
+  return `<article class="cartao sem-grafico" data-s="${est}" data-kpi="${p.id}">
+    <div class="cartao-topo"><h3>${p.titulo}</h3><span class="chip" data-s="${est}">${ROTULO[est]}</span></div>
+    <div class="heroi">
+      <span class="grande">${vazio(valor) ? "—" : N0.format(valor)}</span>
+      <span class="lado">${vazio(pct) ? "—" : N1.format(pct) + "%"}<span>das saídas</span></span>
+    </div>
+    <dl class="analises">${linhas.join("")}</dl>
+  </article>`;
+}
+
+function cartaoMotivos(janela) {
+  const alvo = new Set(janela.atual.periodos);
+  const porFamilia = new Map();
+  for (const m of BASE.motivos) {
+    if (!alvo.has(m.periodo) || !casa(m)) continue;
+    if (!porFamilia.has(m.familia)) porFamilia.set(m.familia, new Map());
+    const mapa = porFamilia.get(m.familia);
+    mapa.set(m.motivo, (mapa.get(m.motivo) || 0) + (Number(m.qtd) || 0));
+  }
+  const a = agregar(janela.atual.periodos, janela.atual.modo);
+  const totalDe = (fam) => {
+    const f = fam.toLowerCase();
+    if (!a) return null;
+    if (f.startsWith("volunt")) return a.desl_vol;
+    if (f.startsWith("involunt")) return a.desl_inv;
+    return null;
+  };
+
+  let colunas = "";
+  if (!porFamilia.size) {
+    colunas = `<div><span class="mini">Sem motivos no recorte</span></div>`;
+  }
+  for (const [fam, mapa] of porFamilia) {
+    const itens = [...mapa].map(([motivo, qtd]) => ({ motivo, qtd })).sort((x, y) => y.qtd - x.qtd).slice(0, 3);
+    const total = totalDe(fam) ?? itens.reduce((s, i) => s + i.qtd, 0);
+    const li = itens.map((it) => {
+      const pct = total ? (it.qtd / total) * 100 : 0;
+      const cor = pct >= 60 ? "var(--cri-marca)" : "var(--verde-claro)";
+      return `<li><span class="nome">${it.motivo}</span><span class="val">${N0.format(it.qtd)}</span>
+        <span class="barra" style="--cor:${cor}"><i style="width:${Math.min(100, pct).toFixed(0)}%"></i></span></li>`;
+    }).join("");
+    colunas += `<div><span class="mini">${fam} · ${N0.format(total)}</span><ol class="rank">${li}</ol></div>`;
+  }
+
+  return `<article class="cartao sem-grafico" data-s="atencao">
+    <div class="cartao-topo"><h3>Motivos de saída</h3><span class="chip" data-s="atencao">Top 3</span></div>
+    <div class="duplo">${colunas}</div>
+    <p class="nota" contenteditable="true" data-campo="nota_motivos">${textoRico(BASE.textos.nota_motivos)}</p>
+  </article>`;
+}
+
+/** A quebra desce um nível conforme o filtro: diretoria por padrão, área dentro de uma diretoria. */
+function cartaoQuebra(janela) {
+  const dim = estado.diretoria ? "area" : "diretoria";
+  const rotulo = estado.diretoria ? `Áreas de ${estado.diretoria}` : "Diretorias";
+  const alvo = new Set(janela.atual.periodos);
+
+  const grupos = new Map();
+  for (const f of BASE.fatos) {
+    if (!alvo.has(f.periodo) || !casa(f)) continue;
+    const k = f[dim];
+    let g = grupos.get(k);
+    if (!g) { g = { vol: 0, inv: 0, hc: 0, np: new Set() }; grupos.set(k, g); }
+    g.vol += Number(f.desl_vol) || 0;
+    g.inv += Number(f.desl_inv) || 0;
+    g.hc += Number(f.hc) || 0;
+    g.np.add(f.periodo);
+  }
+
+  let totalSaidas = 0, totalHc = 0;
+  for (const g of grupos.values()) {
+    g.total = g.vol + g.inv;
+    g.hc = g.np.size ? g.hc / g.np.size : 0;
+    totalSaidas += g.total;
+    totalHc += g.hc;
+  }
+  const temHc = totalHc > 0;
+  for (const g of grupos.values()) {
+    g.pct = totalSaidas ? (g.total / totalSaidas) * 100 : 0;
+    g.taxa = g.hc ? (g.total / g.hc) * 100 : null;
+    g.indice = temHc && g.hc ? (g.total / totalSaidas) / (g.hc / totalHc) : null;
+  }
+
+  const lista = [...grupos].map(([nome, g]) => ({ nome, ...g }))
+    .sort((a, b) => (temHc ? (b.indice ?? 0) - (a.indice ?? 0) : b.total - a.total))
+    .slice(0, 3);
+
+  const linhas = lista.map((g) => `<tr>
+    <td>${g.nome}</td><td>${N0.format(g.vol)}</td><td>${N0.format(g.inv)}</td>
+    <td class="forte">${N0.format(g.total)}</td><td>${N1.format(g.pct)}%</td>
+    <td>${vazio(g.taxa) ? (faltantes++, '<span class="falta">—</span>') : N2.format(g.taxa) + "%"}</td>
+    <td class="${!vazio(g.indice) && g.indice >= 1.15 ? "alerta" : ""}">${vazio(g.indice) ? (faltantes++, '<span class="falta">—</span>') : N2.format(g.indice) + "×"}</td>
+  </tr>`).join("") || `<tr><td colspan="7">Sem dado no recorte</td></tr>`;
+
+  return `<article class="cartao sem-grafico" data-s="nd">
+    <div class="cartao-topo"><h3>${rotulo}</h3><span class="chip" data-s="nd">${temHc ? "Por índice" : "Por volume"}</span></div>
+    <table class="dir">
+      <thead><tr><th>${estado.diretoria ? "Área" : "Diretoria"}</th><th>Vol.</th><th>Inv.</th><th>Total</th><th>% saídas</th><th>Taxa</th><th>Índice</th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>
+    <p class="nota" contenteditable="true" data-campo="nota_diretorias">${textoRico(BASE.textos.nota_diretorias)}</p>
+  </article>`;
+}
+
+/* ==========================================================================
+   Render
+   ========================================================================== */
+function rotuloRecorte() {
+  const p = [estado.empresa, estado.diretoria, estado.area].filter(Boolean);
+  return p.length ? p.join(" › ") : "Consolidado — todas as empresas";
+}
+
+function render() {
+  faltantes = 0;
+  const janela = janelaAtiva();
+
+  document.getElementById("titulo").textContent = BASE.config.titulo || "Movimentações";
+  document.getElementById("subtitulo").textContent =
+    `${janela.titulo} · ${rotuloRecorte()}`;
+  document.getElementById("regua").textContent = BASE.config.regua || "";
+
+  const logo = document.getElementById("logo"), vaz = document.getElementById("logo-vazio");
+  if (BASE.config.logo) { logo.src = BASE.config.logo; logo.hidden = false; vaz.hidden = true; }
+  else { logo.hidden = true; vaz.hidden = false; }
+
+  document.getElementById("linha-kpi").innerHTML = KPIS.map((k) => cartaoKpi(k, janela)).join("");
+  document.getElementById("linha-perfil").innerHTML =
+    PERFIS.map((p) => cartaoPerfil(p, janela)).join("") + cartaoMotivos(janela) + cartaoQuebra(janela);
+  /* O insight é escrito para o consolidado. Sob filtro, os números citados nele
+     não são os da tela — a marca avisa em vez de deixar o leitor tropeçar. */
+  const filtrado = !!(estado.empresa || estado.diretoria || estado.area);
+  document.getElementById("insight").innerHTML =
+    (filtrado ? '<span class="procedencia">análise do consolidado</span>' : "") + textoRico(BASE.textos.insight);
+
+  document.querySelectorAll(".janela button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.j === estado.janela)));
+  document.getElementById("btn-limpar").hidden = !(estado.empresa || estado.diretoria || estado.area);
+
+  const selo = document.getElementById("selo");
+  const partes = [];
+  if (String(BASE.config.dados_exemplo).toLowerCase() === "sim") partes.push("dados ilustrativos");
+  if (faltantes) partes.push(`${faltantes} ${faltantes === 1 ? "campo" : "campos"} sem dado`);
+  selo.hidden = !partes.length;
+  selo.textContent = "◆ " + partes.join(" · ");
+
+  ligarEdicao();
+}
+
+function ligarEdicao() {
+  document.querySelectorAll('[contenteditable="true"]').forEach((el) => {
+    if (el.dataset.ligado) return;
+    el.dataset.ligado = "1";
+    el.addEventListener("blur", () => {
+      const texto = el.innerHTML
+        .replace(/<\/?(b|strong)>/gi, "**").replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+      BASE.textos[el.dataset.campo || "insight"] = texto;
+    });
+  });
+}
+
+/* ---------------- filtros em cascata ---------------- */
+function opcoes(sel, itens, valor, rotuloTodos) {
+  sel.textContent = "";
+  sel.appendChild(new Option(rotuloTodos, ""));
+  for (const i of itens) sel.appendChild(new Option(i, i));
+  sel.value = itens.includes(valor) ? valor : "";
+}
+
+function popularFiltros() {
+  const unico = (campo, filtro) =>
+    [...new Set(BASE.fatos.filter(filtro).map((f) => f[campo]))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  const emp = unico("empresa", () => true);
+  opcoes(document.getElementById("f-empresa"), emp, estado.empresa, "Todas as empresas");
+  estado.empresa = document.getElementById("f-empresa").value;
+
+  const dir = unico("diretoria", (f) => !estado.empresa || f.empresa === estado.empresa);
+  opcoes(document.getElementById("f-diretoria"), dir, estado.diretoria, "Todas as diretorias");
+  estado.diretoria = document.getElementById("f-diretoria").value;
+
+  const ar = unico("area", (f) => (!estado.empresa || f.empresa === estado.empresa) &&
+    (!estado.diretoria || f.diretoria === estado.diretoria));
+  opcoes(document.getElementById("f-area"), ar, estado.area, "Todas as áreas");
+  estado.area = document.getElementById("f-area").value;
+}
+
+for (const [id, campo] of [["f-empresa", "empresa"], ["f-diretoria", "diretoria"], ["f-area", "area"]]) {
+  document.getElementById(id).addEventListener("change", (e) => {
+    estado[campo] = e.target.value;
+    if (campo === "empresa") { estado.diretoria = ""; estado.area = ""; }
+    if (campo === "diretoria") estado.area = "";
+    popularFiltros();
+    render();
+  });
+}
+document.querySelectorAll(".janela button").forEach((b) =>
+  b.addEventListener("click", () => { estado.janela = b.dataset.j; render(); }));
+document.getElementById("btn-limpar").addEventListener("click", () => {
+  estado.empresa = estado.diretoria = estado.area = "";
+  popularFiltros(); render();
+});
+
+/* ==========================================================================
+   Leitura do .xlsx — ZIP + XML na unha, sem biblioteca externa
+   ========================================================================== */
+async function inflar(bytes, metodo) {
+  if (metodo === 0) return bytes;
+  if (metodo !== 8) throw new Error("Compressão do .xlsx não suportada (método " + metodo + ").");
+  if (typeof DecompressionStream === "undefined") throw new Error("Este navegador não descompacta .xlsx.");
+  const fluxo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(fluxo).arrayBuffer());
+}
+
+function abrirZip(buffer) {
+  const dv = new DataView(buffer), u8 = new Uint8Array(buffer);
+  let eocd = -1;
+  for (let i = buffer.byteLength - 22; i >= Math.max(0, buffer.byteLength - 65558); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Não parece um .xlsx válido.");
+  const total = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const entradas = new Map(), td = new TextDecoder();
+  for (let i = 0; i < total; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const metodo = dv.getUint16(p + 10, true), tamanho = dv.getUint32(p + 20, true);
+    const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+    entradas.set(td.decode(u8.subarray(p + 46, p + 46 + nl)), { metodo, tamanho, offset: dv.getUint32(p + 42, true) });
+    p += 46 + nl + el + cl;
+  }
+  return { dv, u8, entradas };
+}
+
+async function lerDoZip(zip, nome) {
+  const e = zip.entradas.get(nome);
+  if (!e) return null;
+  const nl = zip.dv.getUint16(e.offset + 26, true), el = zip.dv.getUint16(e.offset + 28, true);
+  const inicio = e.offset + 30 + nl + el;
+  return new TextDecoder().decode(await inflar(zip.u8.subarray(inicio, inicio + e.tamanho), e.metodo));
+}
+
+const indiceColuna = (letras) => {
+  let n = 0;
+  for (const c of letras) n = n * 26 + (c.charCodeAt(0) - 64);
+  return n - 1;
+};
+
+/** Lê todas as abas do .xlsx e devolve { nomeDaAba: matriz de células }. */
+async function lerPlanilha(buffer) {
+  const zip = abrirZip(buffer);
+  const xml = new DOMParser();
+  const NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+  const wb = xml.parseFromString(await lerDoZip(zip, "xl/workbook.xml"), "application/xml");
+  const rels = xml.parseFromString(await lerDoZip(zip, "xl/_rels/workbook.xml.rels"), "application/xml");
+  const alvo = {};
+  for (const r of rels.getElementsByTagName("Relationship")) alvo[r.getAttribute("Id")] = r.getAttribute("Target");
+
+  const compartilhados = [];
+  const ss = await lerDoZip(zip, "xl/sharedStrings.xml");
+  if (ss) {
+    for (const si of xml.parseFromString(ss, "application/xml").getElementsByTagName("si")) {
+      let t = "";
+      for (const n of si.getElementsByTagName("t")) t += n.textContent;
+      compartilhados.push(t);
+    }
+  }
+
+  const abas = {};
+  for (const aba of wb.getElementsByTagName("sheet")) {
+    const rid = aba.getAttributeNS(NS_R, "id") || aba.getAttribute("r:id");
+    const caminho = (alvo[rid] || "").replace(/^\/?xl\//, "").replace(/^\//, "");
+    const conteudo = await lerDoZip(zip, "xl/" + caminho);
+    if (!conteudo) continue;
+    const doc = xml.parseFromString(conteudo, "application/xml");
+    const linhas = [];
+    for (const tr of doc.getElementsByTagName("row")) {
+      const i = Number(tr.getAttribute("r") || linhas.length + 1) - 1;
+      const cels = [];
+      for (const c of tr.getElementsByTagName("c")) {
+        const ref = (c.getAttribute("r") || "").replace(/\d+/g, "");
+        const ic = ref ? indiceColuna(ref) : cels.length;
+        const tipo = c.getAttribute("t"), v = c.getElementsByTagName("v")[0];
+        if (tipo === "s") cels[ic] = v ? (compartilhados[Number(v.textContent)] ?? "") : "";
+        else if (tipo === "inlineStr") { const t = c.getElementsByTagName("t")[0]; cels[ic] = t ? t.textContent : ""; }
+        else cels[ic] = v ? v.textContent : "";
+      }
+      linhas[i] = cels;
+    }
+    abas[aba.getAttribute("name")] = linhas;
+  }
+  return abas;
+}
+
+/* ---------------- planilha -> base ---------------- */
+const txt = (v) => (v === undefined || v === null ? "" : String(v).trim());
+const n = (v) => {
+  const t = txt(v);
+  if (!t || t === "-" || t === "—") return null;
+  const limpo = t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/\.(?=\d{3}\b)/g, "");
+  const x = Number(limpo);
+  return Number.isFinite(x) ? x : null;
+};
+
+function objetos(linhas) {
+  if (!linhas || linhas.length < 2) return [];
+  const cab = (linhas[0] || []).map((c) => txt(c).toLowerCase());
+  return linhas.slice(1)
+    .filter((l) => l && l.some((c) => txt(c)))
+    .map((l) => Object.fromEntries(cab.map((c, i) => [c, txt(l[i])])));
+}
+
+function montarBase(abas) {
+  const faltando = ["Config", "Fatos", "Textos"].filter((a) => !abas[a]);
+  if (faltando.length) throw new Error("Faltam abas no arquivo: " + faltando.join(", ") + ".");
+
+  const config = {};
+  for (const l of abas.Config) {
+    if (!l) continue;
+    const chave = txt(l[1]);
+    if (chave && txt(l[2])) config[chave] = txt(l[2]);
+  }
+  if (!config.periodo_atual) throw new Error("A aba Config não traz periodo_atual.");
+
+  const numericos = ["hc", "hc_lideres", "hc_ate1ano", "admitidos", "desl_vol", "desl_inv", "desl_lideres", "desl_ate1ano"];
+  const fatos = objetos(abas.Fatos).filter((f) => f.periodo).map((f) => {
+    const o = { empresa: f.empresa, diretoria: f.diretoria, area: f.area, periodo: f.periodo };
+    for (const k of numericos) o[k] = n(f[k]) || 0;
+    return o;
+  });
+  if (!fatos.length) throw new Error("A aba Fatos veio sem linhas.");
+
+  const motivos = objetos(abas.Motivos || []).filter((m) => m.motivo).map((m) => ({
+    empresa: m.empresa, diretoria: m.diretoria, area: m.area,
+    periodo: m.periodo, familia: m.familia, motivo: m.motivo, qtd: n(m.qtd) || 0,
+  }));
+
+  const textos = {};
+  for (const l of abas.Textos) {
+    if (!l) continue;
+    const chave = txt(l[1]);
+    if (chave && txt(l[2])) textos[chave] = txt(l[2]);
+  }
+
+  config.logo = BASE.config.logo || "";
+  return { config, fatos, motivos, textos };
+}
+
+/* ==========================================================================
+   Barra de ferramentas
+   ========================================================================== */
+const painel = document.getElementById("painel-dados");
+const aviso = document.getElementById("aviso");
+
+document.getElementById("btn-dados").addEventListener("click", (e) => {
+  painel.hidden = !painel.hidden;
+  e.currentTarget.setAttribute("aria-expanded", String(!painel.hidden));
+});
+
+document.getElementById("arq-base").addEventListener("change", async (e) => {
+  const arq = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!arq) return;
+  aviso.dataset.t = "ok";
+  aviso.textContent = "Lendo " + arq.name + "…";
+  try {
+    BASE = montarBase(await lerPlanilha(await arq.arrayBuffer()));
+    indexarPeriodos();
+    estado.empresa = estado.diretoria = estado.area = "";
+    estado.janela = ["semana", "mes", "ano"].includes(BASE.config.janela_padrao) ? BASE.config.janela_padrao : "mes";
+    popularFiltros();
+    render();
+    aviso.dataset.t = "ok";
+    aviso.textContent = arq.name + " carregado.";
+    descreverBase();
+  } catch (err) {
+    aviso.dataset.t = "erro";
+    aviso.textContent = err.message;
+  }
+});
+
+function descreverBase() {
+  const seg = new Set(BASE.fatos.map((f) => `${f.empresa}|${f.diretoria}|${f.area}`)).size;
+  const per = new Set(BASE.fatos.map((f) => f.periodo));
+  document.getElementById("resumo-base").textContent =
+    `${BASE.fatos.length} linhas de fato · ${seg} segmentos · ${per.size} períodos ` +
+    `(${[...per].filter(ehMes).length} meses, ${[...per].filter(ehSemana).length} semanas) · ` +
+    `${BASE.motivos.length} linhas de motivo.`;
+}
+
+document.getElementById("arq-logo").addEventListener("change", (e) => {
+  const arq = e.target.files && e.target.files[0];
+  if (!arq) return;
+  const leitor = new FileReader();
+  leitor.onload = () => { BASE.config.logo = leitor.result; render(); };
+  leitor.readAsDataURL(arq);
+});
+
+document.getElementById("btn-imprimir").addEventListener("click", () => window.print());
+
+document.getElementById("btn-salvar").addEventListener("click", () => {
+  const clone = document.documentElement.cloneNode(true);
+  clone.querySelector("#base").textContent = JSON.stringify(BASE);
+  clone.querySelector("#painel-dados").setAttribute("hidden", "");
+  const html = "<!doctype html>\n" + clone.outerHTML;
+  const nome = `movimentacoes-${String(BASE.config.periodo_atual).replace(/-/g, "")}.html`;
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = nome; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+});
+
+/* ---------------- início ---------------- */
+indexarPeriodos();
+if (["semana", "mes", "ano"].includes(BASE.config.janela_padrao)) estado.janela = BASE.config.janela_padrao;
+popularFiltros();
+render();
+descreverBase();
+</script>
+</body>
+</html>

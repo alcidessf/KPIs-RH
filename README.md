@@ -87,6 +87,48 @@ Acrescentar, remover ou renomear indicadores é editar o array `KPIS` em
 
 ## Painel de movimentações (tela 1)
 
+Duas versões, mesma identidade visual e mesmo formato 16:9:
+
+| Arquivo | Base | Filtros |
+|---|---|---|
+| `painel/movimentacoes.html` | `modelo-semanal.xlsx` — um recorte agregado | não |
+| `painel/movimentacoes-filtros.html` | `base-movimentacoes.xlsx` — fatos por segmento | **sim** |
+
+A versão com filtros é a recomendada. A simples continua no repositório para
+quem só precisa do consolidado e quer a planilha menor.
+
+### Por que a base mudou
+
+A versão sem filtros recebia o indicador já calculado. Não havia por onde
+recortar. A base nova traz **componentes brutos por segmento e por período** —
+headcount, admitidos, desligamentos voluntários e involuntários, líderes e
+até 1 ano — e o painel soma o que o filtro selecionou e só então divide.
+
+É o que impede a média de médias: taxa não soma entre áreas, numerador e
+denominador somam. E é o que finalmente permite calcular o que faltava:
+
+- **taxa de incidência** de líderes e de quem tem menos de um ano — a diferença
+  entre "9 líderes saíram" e "a liderança gira a 2,74%, contra 1,70% do grupo"
+- **índice de sobre-representação** por diretoria — participação nas saídas
+  dividida pela participação no quadro. Acima de 1,0× a área perde mais gente
+  do que o seu tamanho justificaria
+
+### O que o filtro faz
+
+Empresa → diretoria → área, em cascata. Tudo na tela é recalculado: os quatro
+indicadores, as taxas, os recortes de perfil, os motivos e a tendência mensal.
+
+A quebra do último cartão desce um nível conforme o filtro: sem filtro mostra
+diretorias, dentro de uma diretoria mostra as áreas dela.
+
+A janela alterna entre semana, mês e ano, e as linhas de comparação mudam junto
+— só entram comparações que a base sustenta.
+
+O insight do rodapé é escrito para o consolidado; sob filtro ele ganha uma marca
+avisando, porque os números citados no texto não são os da tela.
+
+
+
 Arquivo único em `painel/movimentacoes.html`, alimentado por `modelo-semanal.xlsx`.
 Paleta institucional, 16:9 para colar no PPT, espaço para a logo, e rotina de
 atualização sem instalar nada.
