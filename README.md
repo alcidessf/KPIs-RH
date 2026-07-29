@@ -167,7 +167,18 @@ tools/importar-inventario.py     lê a planilha preenchida e escreve as definiç
 tools/gerar-artifact.mjs         extrai a versão para hospedar como página
 docs/MODELO-DE-DADOS.md          contrato de dados: métricas, fórmulas, metas, janelas
 docs/TELA-A-TELA.md              como migrar da apresentação atual para o painel
+docs/TRANSFERENCIA.md            documento de transferência: tudo do projeto em um arquivo
+docs/imagens/                    prints de referência do painel real
+tools/render-docs.mjs            regera os prints e checa se o layout quebrou
 ```
+
+### Entrar no projeto
+
+[`docs/TRANSFERENCIA.md`](docs/TRANSFERENCIA.md) reúne o projeto inteiro num
+arquivo só: paleta com contrastes medidos, layout, modelo de dados, todas as
+fórmulas, a procedência de cada número, as decisões tomadas, as armadilhas já
+encontradas e as questões em aberto. É o ponto de partida para quem chega agora
+— ou para carregar em outra conversa.
 
 ### Trazer os seus indicadores
 
