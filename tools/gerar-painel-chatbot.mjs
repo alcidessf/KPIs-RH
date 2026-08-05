@@ -180,6 +180,7 @@ ol { list-style: none; }
   padding: 0.25cqw 0.45cqw; max-width: 12cqw; cursor: pointer;
 }
 .campo select:focus-visible { outline: 2px solid var(--azul); }
+#f-tema { max-width: 14cqw; }
 .janela { display: flex; gap: 0.08cqw; padding: 0.1cqw; background: var(--papel); border: 1px solid var(--fio); border-radius: 0.35cqw; }
 .janela button {
   font: inherit; font-size: 0.68cqw; font-weight: 600; color: var(--tinta-3);
@@ -323,6 +324,10 @@ ol { list-style: none; }
       <label for="f-area">Área</label>
       <select id="f-area"></select>
     </div>
+    <div class="campo">
+      <label for="f-tema">Tema</label>
+      <select id="f-tema"></select>
+    </div>
     <span class="sep">|</span>
     <label class="toggle-si">
       <input type="checkbox" id="toggle-si"> Incluir Sem Interação nos totais
@@ -370,6 +375,7 @@ const estado = {
   mes: "2026-07",   // mês padrão: julho (mais completo)
   dir: "",
   area: "",
+  tema: "",
   comSI: false,
 };
 
@@ -390,11 +396,15 @@ function filtrar() {
 
 // comSI: quando true inclui Sem Interação no gráfico de temas
 // trendSrc: array de registros para tendência (dir/area filtrado, todos os meses)
-function calcular(linhas, comSI, trendSrc) {
+function calcular(linhas, comSI, trendSrc, temaFiltro) {
   const total      = linhas.length;
   const si         = linhas.filter(r => r[F_TEMA] === IDX_SI).length;
   const interacoes = linhas.filter(r => r[F_TEMA] !== IDX_SI);
   const nInt       = interacoes.length;
+
+  // filtro de tema — aplicado apenas nos breakdowns de turno e diretoria
+  const temaIdx2 = temaFiltro ? LOOKUP.tema.indexOf(temaFiltro) : -1;
+  const srcTema  = temaIdx2 >= 0 ? interacoes.filter(r => r[F_TEMA] === temaIdx2) : interacoes;
   const engaj      = total > 0 ? nInt / total : 0;
   const taxaSI     = total > 0 ? si  / total  : 0;
 
@@ -422,16 +432,16 @@ function calcular(linhas, comSI, trendSrc) {
   // contagem só de temas de interação (para Cobertura — não varia com toggle)
   const nTemasInt = new Set(interacoes.map(r => r[F_TEMA])).size;
 
-  // turnos
+  // turnos — usa srcTema (filtrado por tema quando selecionado)
   const turnoCnt = {};
-  interacoes.forEach(r => {
+  srcTema.forEach(r => {
     const t = LOOKUP.turno[r[F_TURNO]] || "Não informado";
     turnoCnt[t] = (turnoCnt[t]||0)+1;
   });
 
-  // diretoria breakdown
+  // diretoria breakdown — usa srcTema
   const dirCnt = {};
-  interacoes.forEach(r => {
+  srcTema.forEach(r => {
     const d = LOOKUP.dir[r[F_DIR]] || "Não identificado";
     dirCnt[d] = (dirCnt[d]||0)+1;
   });
@@ -452,6 +462,8 @@ function calcular(linhas, comSI, trendSrc) {
     dirsAtivas: dirsAtivas.size,
     topTemas, nTemasInt, turnoCnt, dirCnt,
     mesIntCnt, mesTotCnt,
+    temaFiltro: temaFiltro || null,
+    nTemaInt: srcTema.length,
   };
 }
 
@@ -625,16 +637,24 @@ function cartaoTemas(ag) {
   const itens = top.map(([nome, v]) => {
     const pBar = (v / maxV * 100).toFixed(1);
     const nm   = nome.length > 30 ? nome.slice(0,28)+"…" : nome;
-    return \`<div class="rank-item">
-      <span class="rank-nome">\${nm}</span>
-      <div class="rank-barra"><i style="width:\${pBar}%"></i></div>
+    const isSel = ag.temaFiltro && nome === ag.temaFiltro;
+    const barColor  = isSel ? "var(--azul)" : "var(--verde)";
+    const nomeStyle = isSel ? \`font-weight:700;color:var(--azul)\` : "";
+    const rowStyle  = isSel ? \`background:rgba(28,109,150,.07);border-radius:0.25cqw;margin:0 -0.3cqw;padding:0.22cqw 0.3cqw\` : "";
+    return \`<div class="rank-item" style="\${rowStyle}">
+      <span class="rank-nome" style="\${nomeStyle}">\${nm}</span>
+      <div class="rank-barra"><i style="width:\${pBar}%;background:\${barColor}"></i></div>
       <span class="rank-val">\${N0.format(v)}</span>
     </div>\`;
   }).join("");
 
-  const lblSI = estado.comSI ? " (incl. SI)" : "";
+  const lblSI  = estado.comSI ? " (incl. SI)" : "";
+  const title  = ag.temaFiltro ? "Temas — comparação" : \`Top temas\${lblSI}\`;
+  const chip   = ag.temaFiltro
+    ? \`<span class="chip" data-s="nd">filtrado ↓</span>\`
+    : \`<span class="chip" data-s="nd">\${ag.topTemas.length} temas</span>\`;
   return \`<article class="cartao">
-    <div class="cartao-topo"><h3>Top temas\${lblSI}</h3><span class="chip" data-s="nd">\${ag.topTemas.length} temas</span></div>
+    <div class="cartao-topo"><h3>\${title}</h3>\${chip}</div>
     <div class="rank">\${itens}</div>
   </article>\`;
 }
@@ -653,8 +673,11 @@ function cartaoTurno(ag) {
     </div>\`;
   }).join("");
 
+  const temaLbl = ag.temaFiltro ? (" · " + (ag.temaFiltro.length > 16 ? ag.temaFiltro.slice(0,14)+"…" : ag.temaFiltro)) : "";
+  const title   = \`Por turno\${temaLbl}\`;
+  const chipTxt = ag.temaFiltro ? \`\${N0.format(ag.nTemaInt)} int.\` : \`\${N0.format(total)} int.\`;
   return \`<article class="cartao">
-    <div class="cartao-topo"><h3>Por turno</h3><span class="chip" data-s="nd">\${N0.format(total)} int.</span></div>
+    <div class="cartao-topo"><h3>\${title}</h3><span class="chip" data-s="nd">\${chipTxt}</span></div>
     <div class="lista-perf">\${itens}</div>
   </article>\`;
 }
@@ -678,8 +701,11 @@ function cartaoDir(ag) {
     </div>\`;
   }).join("");
 
+  const temaLbl = ag.temaFiltro ? (" · " + (ag.temaFiltro.length > 16 ? ag.temaFiltro.slice(0,14)+"…" : ag.temaFiltro)) : "";
+  const title   = \`Por diretoria\${temaLbl}\`;
+  const chipTxt = ag.temaFiltro ? \`\${N0.format(ag.nTemaInt)} int.\` : \`\${N0.format(total)} int.\`;
   return \`<article class="cartao">
-    <div class="cartao-topo"><h3>Por diretoria</h3><span class="chip" data-s="nd">\${N0.format(total)} int.</span></div>
+    <div class="cartao-topo"><h3>\${title}</h3><span class="chip" data-s="nd">\${chipTxt}</span></div>
     <div class="lista-perf">\${itens || '<p style="font-size:.7cqw;color:var(--tinta-3)">Sem dados identificados.</p>'}</div>
   </article>\`;
 }
@@ -695,10 +721,11 @@ function render() {
     ? DATA.filter(r => (dirIdx2 < 0 || r[F_DIR] === dirIdx2) && (areaIdx2 < 0 || r[F_AREA] === areaIdx2))
     : DATA;
 
-  const ag = calcular(linhas, estado.comSI, trendSrc);
+  const ag = calcular(linhas, estado.comSI, trendSrc, estado.tema);
 
   // cabeçalho
-  const recorte = [estado.dir, estado.area].filter(Boolean).join(" › ") || "Consolidado";
+  const temaLabel = estado.tema ? \`tema: \${estado.tema}\` : "";
+  const recorte = [estado.dir, estado.area, temaLabel].filter(Boolean).join(" › ") || "Consolidado";
   const perLabel = estado.mes ? mesFmt(estado.mes) : "Todo o período";
   document.getElementById("cab-sub").textContent = perLabel + " · " + recorte;
   document.getElementById("cab-periodo").textContent = new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"short", year:"numeric" });
@@ -726,6 +753,17 @@ function opcoes(sel, itens, valor, rot) {
   sel.appendChild(new Option(rot, ""));
   itens.forEach(v => v && sel.appendChild(new Option(v, v)));
   sel.value = itens.includes(valor) ? valor : "";
+}
+
+// popula o select de temas com base no recorte mes/dir/area atual
+function popularTemas() {
+  const linhasAtuais = filtrar();
+  const temasDisp = [...new Set(
+    linhasAtuais.filter(r => r[F_TEMA] !== IDX_SI).map(r => LOOKUP.tema[r[F_TEMA]])
+  )].sort((a,b) => a.localeCompare(b,"pt-BR"));
+  const fTema = document.getElementById("f-tema");
+  opcoes(fTema, temasDisp, estado.tema, "Todos os temas");
+  estado.tema = fTema.value;
 }
 
 function popularFiltros() {
@@ -757,21 +795,33 @@ function popularFiltros() {
   )].sort((a,b) => a.localeCompare(b,"pt-BR"));
   opcoes(document.getElementById("f-area"), areas, estado.area, "Todas as áreas");
   estado.area = document.getElementById("f-area").value;
+
+  // temas (filtrados pelo recorte mes/dir/area atual)
+  popularTemas();
 }
 
 // ── eventos ───────────────────────────────────────────────────────────────────
 document.getElementById("f-mes").addEventListener("change", e => {
   estado.mes = e.target.value;
+  estado.tema = "";          // temas disponíveis mudam com o mês
+  popularTemas();
   render();
 });
 document.getElementById("f-dir").addEventListener("change", e => {
   estado.dir = e.target.value;
   estado.area = "";
+  estado.tema = "";          // temas mudam com dir/área
   popularFiltros();
   render();
 });
 document.getElementById("f-area").addEventListener("change", e => {
   estado.area = e.target.value;
+  estado.tema = "";          // temas mudam com área
+  popularTemas();
+  render();
+});
+document.getElementById("f-tema").addEventListener("change", e => {
+  estado.tema = e.target.value;
   render();
 });
 document.getElementById("toggle-si").addEventListener("change", e => {
