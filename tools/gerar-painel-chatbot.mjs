@@ -274,15 +274,21 @@ ol { list-style: none; }
 }
 .sec-meta { font-size: 0.62cqw; color: var(--tinta-3); font-weight: 400; }
 
+/* linha tendências: 5 colunas */
+.linha-baixo.modo-trend { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.trend-stat { font-size: 0.6cqw; color: var(--tinta-3); margin-top: 0.18cqw; flex: none; }
+
 /* ── mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .slide { aspect-ratio: auto; height: auto; overflow: visible; gap: 12px; padding: 14px; }
   .linha-kpi   { grid-template-columns: repeat(2, 1fr); }
   .linha-baixo { grid-template-columns: 1fr; }
+  .linha-baixo.modo-trend { grid-template-columns: 1fr; }
   .linha > .cartao { height: auto; min-height: 120px; }
   .cabecalho h1 { font-size: 16px; }
   .cartao h3 { font-size: 12px; }
   .heroi .grande { font-size: 28px; }
+  .trend-stat { font-size: 10px; }
 }
 </style>
 </head>
@@ -290,6 +296,7 @@ ol { list-style: none; }
 
 <div class="ferramentas">
   <span class="marca">Canal RH · WhatsApp</span>
+  <button class="btn" id="btn-tendencias" title="Ver evolução mensal de todos os KPIs">📈 Tendências</button>
   <button class="btn" onclick="window.print()">🖨️ PDF</button>
   <button class="btn primario" id="btn-exportar">📋 Copiar resumo</button>
 </div>
@@ -377,6 +384,7 @@ const estado = {
   area: "",
   tema: "",
   comSI: false,
+  tendencias: false,
 };
 
 // ── filtro e agregação ────────────────────────────────────────────────────────
@@ -710,6 +718,161 @@ function cartaoDir(ag) {
   </article>\`;
 }
 
+// ── tendências mensais ────────────────────────────────────────────────────────
+function calcularTendencias(trendSrc) {
+  const src = trendSrc || DATA;
+  const meses = [...new Set(src.map(r => LOOKUP.mes[r[F_MES]]))].sort();
+  const idxNPSVazio = LOOKUP.nps.indexOf("");
+  return meses.map(m => {
+    const mesIdx = LOOKUP.mes.indexOf(m);
+    const linhasM = src.filter(r => r[F_MES] === mesIdx);
+    const total = linhasM.length;
+    const interacoesM = linhasM.filter(r => r[F_TEMA] !== IDX_SI);
+    const nInt = interacoesM.length;
+    const engaj = total > 0 ? nInt / total : 0;
+    const comNPS = linhasM.filter(r => r[F_NPS] !== idxNPSVazio);
+    const prom = linhasM.filter(r => LOOKUP.nps[r[F_NPS]] === "Promotores").length;
+    const det  = linhasM.filter(r => LOOKUP.nps[r[F_NPS]] === "Detratores").length;
+    const enps = comNPS.length >= 5 ? Math.round((prom - det) / comNPS.length * 100) : null;
+    const dirsAtivas = new Set(
+      interacoesM.filter(r => r[F_DIR] !== IDX_DIR_VAZIO).map(r => r[F_DIR])
+    ).size;
+    return { mes: m, nInt, total, engaj, enps, dirsAtivas };
+  });
+}
+
+// miniSparkSVG — usa concatenação de strings para evitar escaping de template literals
+function miniSparkSVG(pontos, cfg) {
+  const metaVal = cfg.metaVal, minVal = cfg.minVal != null ? cfg.minVal : 0;
+  const fmtBar = cfg.fmtBar, metaLabel = cfg.metaLabel, colorFn = cfg.colorFn;
+  const vals = pontos.map(p => p.val).filter(v => v !== null);
+  if (!vals.length) return '<p style="font-size:.65cqw;color:var(--tinta-3)">Sem dados</p>';
+  const media = vals.reduce((a,b)=>a+b,0) / vals.length;
+  const maxV  = (metaVal != null ? Math.max(metaVal * 1.2, ...vals) : Math.max(...vals)) * 1.06;
+  const range = Math.max(maxV - minVal, 1);
+  const W = 100, H = 50;
+  const pad = { t: 9, r: 7, b: 13, l: 5 };
+  const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
+  const n = pontos.length;
+  const bw = Math.max(2, (cw / n) * 0.56);
+  const yx = v => H - pad.b - ((v - minVal) / range) * ch;
+  const cx = i => pad.l + (i + 0.5) * (cw / n);
+
+  let barras = '';
+  pontos.forEach((p, i) => {
+    const lbl = '<text x="' + cx(i).toFixed(1) + '" y="' + (H-pad.b+4.5).toFixed(1) +
+      '" text-anchor="middle" font-size="2.8" fill="#6E7873">' + mesFmt(p.mes) + '</text>';
+    if (p.val === null) {
+      barras += lbl + '<text x="' + cx(i).toFixed(1) + '" y="' + (H-pad.b-1.5).toFixed(1) +
+        '" text-anchor="middle" font-size="2.8" fill="#CBD2CA">—</text>';
+      return;
+    }
+    const isCur = p.mes === (estado.mes || MES_ATUAL);
+    const fill  = colorFn(p.val);
+    const zeroY = yx(Math.max(minVal, 0));
+    const valY  = yx(p.val);
+    const barTop = Math.min(zeroY, valY);
+    const barH   = Math.max(0.5, Math.abs(zeroY - valY));
+    barras += lbl +
+      '<rect x="' + (cx(i)-bw/2).toFixed(1) + '" y="' + barTop.toFixed(1) +
+        '" width="' + bw.toFixed(1) + '" height="' + barH.toFixed(1) +
+        '" fill="' + fill + '" opacity="' + (isCur?1:0.5) + '" rx="0.6"/>' +
+      '<text x="' + cx(i).toFixed(1) + '" y="' + (barTop-1.5).toFixed(1) +
+        '" text-anchor="middle" font-size="3.2" fill="' + fill + '" font-weight="700">' + fmtBar(p.val) + '</text>';
+  });
+
+  let metaLine = '';
+  if (metaVal != null) {
+    const my = yx(metaVal);
+    metaLine = '<line x1="' + pad.l + '" y1="' + my.toFixed(1) + '" x2="' + (W-pad.r) + '" y2="' + my.toFixed(1) +
+      '" stroke="#B54728" stroke-width="0.7" stroke-dasharray="2,1.5"/>' +
+      '<text x="' + (W-pad.r-0.5).toFixed(1) + '" y="' + (my-1.3).toFixed(1) +
+        '" text-anchor="end" font-size="2.8" fill="#B54728">' + metaLabel + '</text>';
+  }
+  const my2 = yx(media);
+  const mediaLine = '<line x1="' + pad.l + '" y1="' + my2.toFixed(1) + '" x2="' + (W-pad.r) + '" y2="' + my2.toFixed(1) +
+    '" stroke="#1C6D96" stroke-width="0.5" stroke-dasharray="1.5,1" opacity="0.7"/>' +
+    '<text x="' + pad.l.toFixed(1) + '" y="' + (my2-1.3).toFixed(1) +
+      '" text-anchor="start" font-size="2.8" fill="#1C6D96" opacity="0.9">méd</text>';
+
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;width:100%;flex:1;display:block">' +
+    mediaLine + barras + metaLine + '</svg>';
+}
+
+function trendInfo(td, getVal, metaOk) {
+  const vals = td.map(getVal).filter(v => v !== null);
+  if (!vals.length) return { chip: "nd", arrow: "—", media: null };
+  const media = vals.reduce((a,b)=>a+b,0) / vals.length;
+  const last  = vals[vals.length-1];
+  const prev  = vals.length >= 2 ? vals[vals.length-2] : last;
+  const delta = last - prev;
+  const thr   = Math.max(Math.abs(media * 0.04), 0.5);
+  const arrow = delta > thr ? "↑" : delta < -thr ? "↓" : "→";
+  return { chip: metaOk(last), arrow, media };
+}
+
+function cartaoTrendVolume(td) {
+  const pontos = td.map(p => ({ mes: p.mes, val: p.nInt }));
+  const { chip, arrow, media } = trendInfo(td, p=>p.nInt, v=>v>=META_MENSAL?"bom":v>=META_MENSAL*.75?"atencao":"critico");
+  const svg = miniSparkSVG(pontos, { metaVal:META_MENSAL, fmtBar:v=>v>=1000?N0.format(v):String(v), metaLabel:"meta 1.000", colorFn:v=>v>=META_MENSAL?"#00694A":v>=META_MENSAL*.75?"#877C00":"#B54728" });
+  const mediaStr = media !== null ? N0.format(Math.round(media)) : "—";
+  return \`<article class="cartao">
+    <div class="cartao-topo"><h3>1 · Volume</h3><span class="chip" data-s="\${chip}">\${arrow} méd \${mediaStr}</span></div>
+    <div class="tendencia">\${svg}</div>
+    <div class="trend-stat">Meta: \${N0.format(META_MENSAL)} int./mês</div>
+  </article>\`;
+}
+
+function cartaoTrendEngaj(td) {
+  const pontos = td.map(p => ({ mes: p.mes, val: p.engaj }));
+  const { chip, arrow, media } = trendInfo(td, p=>p.engaj, v=>v>=.4?"bom":v>=.2?"atencao":"critico");
+  const svg = miniSparkSVG(pontos, { metaVal:0.4, fmtBar:v=>pct(v), metaLabel:"meta 40%", colorFn:v=>v>=.4?"#00694A":v>=.2?"#877C00":"#B54728" });
+  const mediaStr = media !== null ? pct(media) : "—";
+  return \`<article class="cartao">
+    <div class="cartao-topo"><h3>2 · Engajamento</h3><span class="chip" data-s="\${chip}">\${arrow} méd \${mediaStr}</span></div>
+    <div class="tendencia">\${svg}</div>
+    <div class="trend-stat">Meta: ≥ 40% · mercado 0–6m: 20–35%</div>
+  </article>\`;
+}
+
+function cartaoTrendIA(td) {
+  // IA: valor fixo (sem variação por mês nos dados disponíveis)
+  const pontos = td.map(p => ({ mes: p.mes, val: 0.991 }));
+  const svg = miniSparkSVG(pontos, { metaVal:0.85, fmtBar:()=>"99,1%", metaLabel:"ref 85%", colorFn:()=>"#00694A" });
+  return \`<article class="cartao">
+    <div class="cartao-topo"><h3>3 · Efetividade IA</h3><span class="chip" data-s="bom">→ 99,1%</span></div>
+    <div class="tendencia">\${svg}</div>
+    <div class="trend-stat">Referência mercado 12m+: 85–95%</div>
+  </article>\`;
+}
+
+function cartaoTrendNPS(td) {
+  const comDado = td.filter(p => p.enps !== null);
+  const pontos  = td.map(p => ({ mes: p.mes, val: p.enps }));
+  const { chip, arrow, media } = trendInfo(td, p=>p.enps, v=>v===null?"nd":v>=50?"bom":v>=0?"atencao":"critico");
+  const svg = miniSparkSVG(pontos, { metaVal:50, minVal:-100, fmtBar:v=>String(v), metaLabel:"meta 50", colorFn:v=>v>=50?"#00694A":v>=0?"#877C00":"#B54728" });
+  const mediaStr = media !== null ? String(Math.round(media)) : "—";
+  const chipLabel = comDado.length ? (arrow + " méd " + mediaStr) : "Poucos dados";
+  return \`<article class="cartao">
+    <div class="cartao-topo"><h3>4 · Satisfação</h3><span class="chip" data-s="\${chip || 'nd'}">\${chipLabel}</span></div>
+    <div class="tendencia">\${svg}</div>
+    <div class="trend-stat">eNPS · meta: > 50 · top 10% mercado</div>
+  </article>\`;
+}
+
+function cartaoTrendCobertura(td) {
+  const totalDirs = 11;
+  const pontos = td.map(p => ({ mes: p.mes, val: p.dirsAtivas }));
+  const { chip, arrow, media } = trendInfo(td, p=>p.dirsAtivas, v=>v>=8?"bom":v>=5?"atencao":"critico");
+  const svg = miniSparkSVG(pontos, { metaVal:8, fmtBar:v=>String(v), metaLabel:"meta 8 dirs", colorFn:v=>v>=8?"#00694A":v>=5?"#877C00":"#B54728" });
+  const mediaStr = media !== null ? N1.format(media) : "—";
+  return \`<article class="cartao">
+    <div class="cartao-topo"><h3>5 · Cobertura</h3><span class="chip" data-s="\${chip}">\${arrow} méd \${mediaStr}</span></div>
+    <div class="tendencia">\${svg}</div>
+    <div class="trend-stat">Dirs. ativas de \${totalDirs} · meta: ≥ 8</div>
+  </article>\`;
+}
+
 // ── render principal ──────────────────────────────────────────────────────────
 function render() {
   const linhas = filtrar();
@@ -737,9 +900,19 @@ function render() {
   document.getElementById("linha-kpi").innerHTML =
     cardVolume(ag) + cardEngajamento(ag) + cardIA(ag) + cardSatisfacao(ag) + cardCobertura(ag);
 
-  // análise
-  document.getElementById("linha-baixo").innerHTML =
-    cartaoTendencia(ag) + cartaoTemas(ag) + cartaoTurno(ag) + cartaoDir(ag);
+  // análise — modo normal ou modo tendências
+  const linhaBaixo = document.getElementById("linha-baixo");
+  if (estado.tendencias) {
+    const td = calcularTendencias(trendSrc);
+    linhaBaixo.classList.add("modo-trend");
+    linhaBaixo.innerHTML =
+      cartaoTrendVolume(td) + cartaoTrendEngaj(td) + cartaoTrendIA(td) + cartaoTrendNPS(td) + cartaoTrendCobertura(td);
+  } else {
+    linhaBaixo.classList.remove("modo-trend");
+    linhaBaixo.innerHTML =
+      cartaoTendencia(ag) + cartaoTemas(ag) + cartaoTurno(ag) + cartaoDir(ag);
+  }
+  document.getElementById("btn-tendencias").classList.toggle("ativo", estado.tendencias);
 
   // janela buttons
   document.querySelectorAll(".janela button").forEach(b =>
@@ -826,6 +999,10 @@ document.getElementById("f-tema").addEventListener("change", e => {
 });
 document.getElementById("toggle-si").addEventListener("change", e => {
   estado.comSI = e.target.checked;
+  render();
+});
+document.getElementById("btn-tendencias").addEventListener("click", () => {
+  estado.tendencias = !estado.tendencias;
   render();
 });
 
