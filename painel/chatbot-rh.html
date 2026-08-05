@@ -173,12 +173,11 @@ ol { list-style: none; }
 .rank-barra i { display: block; height: 100%; border-radius: 0.15cqw; background: var(--verde); }
 .rank-val { color: var(--tinta); font-weight: 700; text-align: right; white-space: nowrap; }
 
-/* turno/diretoria listas */
+/* turno/diretoria listas — 3 colunas: nome-fixo | barra-flex | valor */
 .lista-perf { display: flex; flex-direction: column; gap: 0; flex: 1; overflow: hidden; }
-.perf-item { display: grid; grid-template-columns: 1fr auto; gap: 0.3cqw; align-items: center; padding: 0.28cqw 0; border-top: 1px solid var(--fio); font-size: 0.68cqw; }
+.perf-item { display: grid; grid-template-columns: 5cqw 1fr auto; gap: 0.3cqw; align-items: center; padding: 0.28cqw 0; border-top: 1px solid var(--fio); font-size: 0.68cqw; }
 .perf-item:first-child { border-top: 0; }
-.perf-nome { color: var(--tinta-2); display: flex; align-items: center; gap: 0.35cqw; }
-.perf-barra { display: inline-block; height: 0.25cqw; border-radius: 0.15cqw; background: var(--verde-claro); vertical-align: middle; }
+.perf-nome { color: var(--tinta-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .perf-val { color: var(--tinta); font-weight: 700; text-align: right; white-space: nowrap; }
 .perf-pct { color: var(--tinta-3); font-weight: 400; font-size: 0.62cqw; }
 
@@ -497,57 +496,54 @@ function cardCobertura(ag) {
 
 // ── gráfico de tendência ──────────────────────────────────────────────────────
 function cartaoTendencia(ag) {
-  // apenas meses com algum dado de interação
+  // apenas meses com algum dado de interação, ordenados
   const mesesInt = Object.entries(ag.mesIntCnt)
     .filter(([m]) => ag.mesIntCnt[m] > 0)
     .sort((a,b) => a[0].localeCompare(b[0]));
 
   if (!mesesInt.length) return `<article class="cartao"><div class="cartao-topo"><h3>Tendência mensal</h3></div><p style="font-size:.7cqw;color:var(--tinta-3)">Sem dados.</p></article>`;
 
-  const maxVal = Math.max(META_MENSAL * 1.15, ...mesesInt.map(([,v])=>v));
-  const W = 100, H = 60; // unidades SVG (viewBox)
-  const pad = { t: 6, r: 4, b: 14, l: 28 };
+  const maxVal = Math.max(META_MENSAL * 1.2, ...mesesInt.map(([,v])=>v));
+  // SVG sem eixo Y — padding simétrico e limpo
+  const W = 100, H = 58;
+  const pad = { t: 8, r: 12, b: 13, l: 4 };
   const cw = W - pad.l - pad.r;
   const ch = H - pad.t - pad.b;
   const n  = mesesInt.length;
-  const bw = Math.max(2, (cw / n) * 0.55);
-  const gap = (cw / n) * 0.45;
+  const bw = Math.min(14, Math.max(3, (cw / n) * 0.6));
 
   const yx = v => H - pad.b - (v / maxVal) * ch;
   const cx = i => pad.l + (i + 0.5) * (cw / n);
 
-  // linha da meta
-  const metaY = yx(META_MENSAL);
+  // grade horizontal sutil (sem labels Y)
+  const gridLines = [0, META_MENSAL * 0.5, META_MENSAL].map(v =>
+    '<line x1="' + pad.l + '" y1="' + yx(v).toFixed(1) + '" x2="' + (W - pad.r) + '" y2="' + yx(v).toFixed(1) + '" stroke="#E3E7E0" stroke-width="0.4"/>'
+  ).join('');
 
   const barras = mesesInt.map(([m, v], i) => {
-    const x = cx(i) - bw / 2;
-    const y = yx(v);
-    const h = H - pad.b - y;
+    const x    = cx(i) - bw / 2;
+    const y    = yx(v);
+    const h    = H - pad.b - y;
     const isCur = m === (estado.mes || MES_ATUAL);
     const fill  = v >= META_MENSAL ? "#00694A" : v >= META_MENSAL * 0.75 ? "#877C00" : "#B54728";
-    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}"
-      fill="${fill}" opacity="${isCur ? '1' : '0.55'}" rx="0.5"/>
-    <text x="${cx(i).toFixed(1)}" y="${(y-1.5).toFixed(1)}" text-anchor="middle" font-size="3.5" fill="${fill}" font-weight="600">${v >= 1000 ? N0.format(v) : v}</text>
-    <text x="${cx(i).toFixed(1)}" y="${(H-pad.b+4).toFixed(1)}" text-anchor="middle" font-size="3.5" fill="#6E7873">${mesFmt(m)}</text>`;
-  }).join("");
+    const valLbl = v >= 1000 ? N0.format(v) : String(v);
+    return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '"' +
+           ' fill="' + fill + '" opacity="' + (isCur ? 1 : 0.5) + '" rx="0.8"/>' +
+           '<text x="' + cx(i).toFixed(1) + '" y="' + (y - 1.8).toFixed(1) + '" text-anchor="middle" font-size="3.8" fill="' + fill + '" font-weight="700">' + valLbl + '</text>' +
+           '<text x="' + cx(i).toFixed(1) + '" y="' + (H - pad.b + 4.5).toFixed(1) + '" text-anchor="middle" font-size="3.5" fill="#6E7873">' + mesFmt(m) + '</text>';
+  }).join('');
 
-  // eixo Y — referências
-  const refs = [0, META_MENSAL * 0.5, META_MENSAL];
-  const yticks = refs.map(v => `
-    <line x1="${pad.l}" y1="${yx(v).toFixed(1)}" x2="${W-pad.r}" y2="${yx(v).toFixed(1)}" stroke="#E3E7E0" stroke-width="0.5"/>
-    <text x="${(pad.l-1).toFixed(1)}" y="${(yx(v)+1.2).toFixed(1)}" text-anchor="end" font-size="3.5" fill="#6E7873">${N0.format(v)}</text>
-  `).join("");
+  // meta — label colado no lado direito da linha
+  const metaY = yx(META_MENSAL);
+  const metaLine = '<line x1="' + pad.l + '" y1="' + metaY.toFixed(1) + '" x2="' + (W - pad.r) + '" y2="' + metaY.toFixed(1) + '"' +
+                   ' stroke="#B54728" stroke-width="0.9" stroke-dasharray="2.5,1.5"/>' +
+                   '<text x="' + (W - 0.5) + '" y="' + (metaY - 1.2).toFixed(1) + '" text-anchor="end" font-size="3.2" fill="#B54728" font-weight="700">1.000</text>';
 
-  const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-    ${yticks}
-    ${barras}
-    <line x1="${pad.l}" y1="${metaY.toFixed(1)}" x2="${W-pad.r}" y2="${metaY.toFixed(1)}"
-      stroke="#B54728" stroke-width="0.8" stroke-dasharray="2,1.5"/>
-    <text x="${(W-pad.r-0.5).toFixed(1)}" y="${(metaY-1).toFixed(1)}" text-anchor="end" font-size="3.5" fill="#B54728" font-weight="700">meta ${N0.format(META_MENSAL)}</text>
-  </svg>`;
+  const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;width:100%;display:block;flex:1">' +
+              gridLines + barras + metaLine + '</svg>';
 
   return `<article class="cartao">
-    <div class="cartao-topo"><h3>Interações por mês</h3><span class="chip" data-s="nd">vs meta 1.000</span></div>
+    <div class="cartao-topo"><h3>Interações por mês</h3><span class="chip" data-s="nd">meta 1.000</span></div>
     <div class="tendencia">${svg}</div>
   </article>`;
 }
@@ -587,10 +583,11 @@ function cartaoTurno(ag) {
   const ord   = Object.entries(ag.turnoCnt).sort((a,b)=>b[1]-a[1]);
   const maxV  = ord[0] ? ord[0][1] : 1;
   const itens = ord.map(([t, v]) => {
-    const p = total ? v / total : 0;
-    const bw = Math.round((v / maxV) * 100);
+    const p    = total ? v / total : 0;
+    const pBar = (v / maxV * 100).toFixed(1);
     return `<div class="perf-item">
-      <span class="perf-nome">${t}<i class="perf-barra" style="width:${bw*0.3}cqw"></i></span>
+      <span class="perf-nome">${t}</span>
+      <div class="rank-barra"><i style="width:${pBar}%;background:var(--verde-claro)"></i></div>
       <span class="perf-val">${N0.format(v)} <span class="perf-pct">(${pct(p)})</span></span>
     </div>`;
   }).join("");
@@ -614,11 +611,12 @@ function cartaoDir(ag) {
   const maxV = ord[0] ? ord[0][1] : 1;
 
   const itens = ord.map(([d, v]) => {
-    const p  = total ? v / total : 0;
-    const bw = Math.round((v / maxV) * 100);
-    const nm = d.length > 22 ? d.slice(0,20)+"…" : d;
+    const p    = total ? v / total : 0;
+    const pBar = (v / maxV * 100).toFixed(1);
+    const nm   = d.length > 18 ? d.slice(0,16)+"…" : d;
     return `<div class="perf-item">
-      <span class="perf-nome">${nm}<i class="perf-barra" style="width:${bw*0.28}cqw"></i></span>
+      <span class="perf-nome" title="${d}">${nm}</span>
+      <div class="rank-barra"><i style="width:${pBar}%;background:var(--verde-claro)"></i></div>
       <span class="perf-val">${N0.format(v)} <span class="perf-pct">(${pct(p)})</span></span>
     </div>`;
   }).join("");
