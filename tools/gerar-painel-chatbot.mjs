@@ -717,25 +717,35 @@ function cartaoDir(ag) {
 }
 
 // ── tendências mensais ────────────────────────────────────────────────────────
-function calcularTendencias(trendSrc) {
+function calcularTendencias(trendSrc, temaFiltro) {
   const src = trendSrc || DATA;
   const meses = [...new Set(src.map(r => LOOKUP.mes[r[F_MES]]))].sort();
   const idxNPSVazio = LOOKUP.nps.indexOf("");
+  const temaIdx = temaFiltro ? LOOKUP.tema.indexOf(temaFiltro) : -1;
   return meses.map(m => {
     const mesIdx = LOOKUP.mes.indexOf(m);
     const linhasM = src.filter(r => r[F_MES] === mesIdx);
     const total = linhasM.length;
     const interacoesM = linhasM.filter(r => r[F_TEMA] !== IDX_SI);
-    const nInt = interacoesM.length;
-    const engaj = total > 0 ? nInt / total : 0;
-    const comNPS = linhasM.filter(r => r[F_NPS] !== idxNPSVazio);
-    const prom = linhasM.filter(r => LOOKUP.nps[r[F_NPS]] === "Promotores").length;
-    const det  = linhasM.filter(r => LOOKUP.nps[r[F_NPS]] === "Detratores").length;
+    const nIntTotal = interacoesM.length;
+    // com filtro de tema: apenas as interações daquele tema
+    const temaInterM = temaIdx >= 0 ? interacoesM.filter(r => r[F_TEMA] === temaIdx) : interacoesM;
+    const nInt = temaInterM.length;
+    // engaj: sem tema = taxa canal (nInt/total); com tema = participação no tema (nInt/nIntTotal)
+    const engaj = temaIdx >= 0
+      ? (nIntTotal > 0 ? nInt / nIntTotal : 0)
+      : (total > 0 ? nIntTotal / total : 0);
+    // NPS: filtrado pelo tema quando selecionado
+    const npsLinhas = temaIdx >= 0 ? temaInterM : linhasM;
+    const comNPS = npsLinhas.filter(r => r[F_NPS] !== idxNPSVazio);
+    const prom = npsLinhas.filter(r => LOOKUP.nps[r[F_NPS]] === "Promotores").length;
+    const det  = npsLinhas.filter(r => LOOKUP.nps[r[F_NPS]] === "Detratores").length;
     const enps = comNPS.length >= 5 ? Math.round((prom - det) / comNPS.length * 100) : null;
+    // cobertura: dirs usando o tema filtrado
     const dirsAtivas = new Set(
-      interacoesM.filter(r => r[F_DIR] !== IDX_DIR_VAZIO).map(r => r[F_DIR])
+      temaInterM.filter(r => r[F_DIR] !== IDX_DIR_VAZIO).map(r => r[F_DIR])
     ).size;
-    return { mes: m, nInt, total, engaj, enps, dirsAtivas };
+    return { mes: m, nInt, nIntTotal, total, engaj, enps, dirsAtivas };
   });
 }
 
@@ -810,26 +820,45 @@ function trendInfo(td, getVal, metaOk) {
 }
 
 function cartaoTrendVolume(td) {
-  const pontos = td.map(p => ({ mes: p.mes, val: p.nInt }));
-  const { chip, arrow, media } = trendInfo(td, p=>p.nInt, v=>v>=META_MENSAL?"bom":v>=META_MENSAL*.75?"atencao":"critico");
-  const svg = miniSparkSVG(pontos, { metaVal:META_MENSAL, fmtBar:v=>v>=1000?N0.format(v):String(v), metaLabel:"meta 1.000", colorFn:v=>v>=META_MENSAL?"#00694A":v>=META_MENSAL*.75?"#877C00":"#B54728" });
+  const comTema = !!estado.tema;
+  const pontos  = td.map(p => ({ mes: p.mes, val: p.nInt }));
+  // com tema: sem meta fixa (cada tema tem volume próprio), cor azul informacional
+  const metaVal  = comTema ? null : META_MENSAL;
+  const colorFn  = comTema ? () => "#1C6D96"
+    : v => v>=META_MENSAL?"#00694A":v>=META_MENSAL*.75?"#877C00":"#B54728";
+  const metaOk   = comTema ? v=>v>0?"nd":"nd"
+    : v=>v>=META_MENSAL?"bom":v>=META_MENSAL*.75?"atencao":"critico";
+  const { chip, arrow, media } = trendInfo(td, p=>p.nInt, metaOk);
+  const svg = miniSparkSVG(pontos, { metaVal, fmtBar:v=>v>=1000?N0.format(v):String(v), metaLabel:"meta 1.000", colorFn });
   const mediaStr = media !== null ? N0.format(Math.round(media)) : "—";
+  const chipS    = comTema ? "nd" : chip;
+  const stat     = comTema ? "Buscas pelo tema por mês" : \`Meta: \${N0.format(META_MENSAL)} int./mês\`;
   return \`<article class="cartao">
-    <div class="cartao-topo"><h3>1 · Volume</h3><span class="chip" data-s="\${chip}">\${arrow} méd \${mediaStr}</span></div>
+    <div class="cartao-topo"><h3>1 · Volume</h3><span class="chip" data-s="\${chipS}">\${arrow} méd \${mediaStr}</span></div>
     <div class="tendencia">\${svg}</div>
-    <div class="trend-stat">Meta: \${N0.format(META_MENSAL)} int./mês</div>
+    <div class="trend-stat">\${stat}</div>
   </article>\`;
 }
 
 function cartaoTrendEngaj(td) {
-  const pontos = td.map(p => ({ mes: p.mes, val: p.engaj }));
-  const { chip, arrow, media } = trendInfo(td, p=>p.engaj, v=>v>=.4?"bom":v>=.2?"atencao":"critico");
-  const svg = miniSparkSVG(pontos, { metaVal:0.4, fmtBar:v=>pct(v), metaLabel:"meta 40%", colorFn:v=>v>=.4?"#00694A":v>=.2?"#877C00":"#B54728" });
+  const comTema = !!estado.tema;
+  const pontos  = td.map(p => ({ mes: p.mes, val: p.engaj }));
+  // com tema: engaj vira "participação do tema" — sem meta fixa de 40%
+  const metaVal = comTema ? null : 0.4;
+  const colorFn = comTema ? () => "#1C6D96"
+    : v => v>=.4?"#00694A":v>=.2?"#877C00":"#B54728";
+  const metaOk  = comTema ? () => "nd"
+    : v=>v>=.4?"bom":v>=.2?"atencao":"critico";
+  const { chip, arrow, media } = trendInfo(td, p=>p.engaj, metaOk);
+  const svg = miniSparkSVG(pontos, { metaVal, fmtBar:v=>pct(v), metaLabel:"meta 40%", colorFn });
   const mediaStr = media !== null ? pct(media) : "—";
+  const title    = comTema ? "2 · Participação" : "2 · Engajamento";
+  const chipS    = comTema ? "nd" : chip;
+  const stat     = comTema ? "% das interações sobre este tema" : "Meta: ≥ 40% · mercado 0–6m: 20–35%";
   return \`<article class="cartao">
-    <div class="cartao-topo"><h3>2 · Engajamento</h3><span class="chip" data-s="\${chip}">\${arrow} méd \${mediaStr}</span></div>
+    <div class="cartao-topo"><h3>\${title}</h3><span class="chip" data-s="\${chipS}">\${arrow} méd \${mediaStr}</span></div>
     <div class="tendencia">\${svg}</div>
-    <div class="trend-stat">Meta: ≥ 40% · mercado 0–6m: 20–35%</div>
+    <div class="trend-stat">\${stat}</div>
   </article>\`;
 }
 
@@ -845,29 +874,39 @@ function cartaoTrendIA(td) {
 }
 
 function cartaoTrendNPS(td) {
-  const comDado = td.filter(p => p.enps !== null);
-  const pontos  = td.map(p => ({ mes: p.mes, val: p.enps }));
+  const comTema  = !!estado.tema;
+  const comDado  = td.filter(p => p.enps !== null);
+  const pontos   = td.map(p => ({ mes: p.mes, val: p.enps }));
   const { chip, arrow, media } = trendInfo(td, p=>p.enps, v=>v===null?"nd":v>=50?"bom":v>=0?"atencao":"critico");
   const svg = miniSparkSVG(pontos, { metaVal:50, minVal:-100, fmtBar:v=>String(v), metaLabel:"meta 50", colorFn:v=>v>=50?"#00694A":v>=0?"#877C00":"#B54728" });
-  const mediaStr = media !== null ? String(Math.round(media)) : "—";
+  const mediaStr  = media !== null ? String(Math.round(media)) : "—";
   const chipLabel = comDado.length ? (arrow + " méd " + mediaStr) : "Poucos dados";
+  const stat = comTema ? "eNPS do tema · meta: > 50" : "eNPS · meta: > 50 · top 10% mercado";
   return \`<article class="cartao">
     <div class="cartao-topo"><h3>4 · Satisfação</h3><span class="chip" data-s="\${chip || 'nd'}">\${chipLabel}</span></div>
     <div class="tendencia">\${svg}</div>
-    <div class="trend-stat">eNPS · meta: > 50 · top 10% mercado</div>
+    <div class="trend-stat">\${stat}</div>
   </article>\`;
 }
 
 function cartaoTrendCobertura(td) {
   const totalDirs = 11;
+  const comTema   = !!estado.tema;
+  // com tema: meta menor — 5 dirs já é boa cobertura para um único tema
+  const metaRef  = comTema ? 5 : 8;
+  const metaOk   = comTema ? v=>v>=5?"bom":v>=3?"atencao":"critico"
+    : v=>v>=8?"bom":v>=5?"atencao":"critico";
+  const colorFn  = comTema ? v=>v>=5?"#00694A":v>=3?"#877C00":"#B54728"
+    : v=>v>=8?"#00694A":v>=5?"#877C00":"#B54728";
   const pontos = td.map(p => ({ mes: p.mes, val: p.dirsAtivas }));
-  const { chip, arrow, media } = trendInfo(td, p=>p.dirsAtivas, v=>v>=8?"bom":v>=5?"atencao":"critico");
-  const svg = miniSparkSVG(pontos, { metaVal:8, fmtBar:v=>String(v), metaLabel:"meta 8 dirs", colorFn:v=>v>=8?"#00694A":v>=5?"#877C00":"#B54728" });
+  const { chip, arrow, media } = trendInfo(td, p=>p.dirsAtivas, metaOk);
+  const svg = miniSparkSVG(pontos, { metaVal:metaRef, fmtBar:v=>String(v), metaLabel:\`meta \${metaRef}\`, colorFn });
   const mediaStr = media !== null ? N1.format(media) : "—";
+  const stat = comTema ? \`Dirs. usando este tema (de \${totalDirs})\` : \`Dirs. ativas de \${totalDirs} · meta: ≥ 8\`;
   return \`<article class="cartao">
     <div class="cartao-topo"><h3>5 · Cobertura</h3><span class="chip" data-s="\${chip}">\${arrow} méd \${mediaStr}</span></div>
     <div class="tendencia">\${svg}</div>
-    <div class="trend-stat">Dirs. ativas de \${totalDirs} · meta: ≥ 8</div>
+    <div class="trend-stat">\${stat}</div>
   </article>\`;
 }
 
@@ -901,7 +940,7 @@ function render() {
   // análise — modo normal ou modo tendências
   const linhaBaixo = document.getElementById("linha-baixo");
   if (estado.tendencias) {
-    const td = calcularTendencias(trendSrc);
+    const td = calcularTendencias(trendSrc, estado.tema);
     linhaBaixo.classList.add("modo-trend");
     linhaBaixo.innerHTML =
       cartaoTrendVolume(td) + cartaoTrendEngaj(td) + cartaoTrendIA(td) + cartaoTrendNPS(td) + cartaoTrendCobertura(td);
