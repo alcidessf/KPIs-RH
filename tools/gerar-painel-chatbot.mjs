@@ -1,7 +1,7 @@
 // Gera painel/chatbot-rh.html — painel de KPIs do Canal RH WhatsApp
 // node tools/gerar-painel-chatbot.mjs
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,14 +20,14 @@ const campo = (row, nome) => {
 const rows = linhas.slice(1).map(l => {
   const f = l.split(";");
   const d = campo(f, "Data");
-  let mes = "";
+  let mes = "", data = "";
   if (d) {
     const m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-    if (m) mes = m[3] + "-" + m[2];
+    if (m) { mes = m[3] + "-" + m[2]; data = m[3] + "-" + m[2] + "-" + m[1]; }
   }
   return {
     id:    campo(f, "chave_pessoa_unica"),
-    mes,
+    mes, data,
     tema:  campo(f, "motivo_pesquisa"),
     auth:  campo(f, "flag_cadastrado") === "1" ? 1 : 0,
     dir:   campo(f, "diretoria"),
@@ -51,6 +51,7 @@ const LD = makeLookup("dir");
 const LA = makeLookup("area");
 const LR = makeLookup("turno");
 const LN = makeLookup("nps");
+const LF = makeLookup("data");  // full date YYYY-MM-DD
 
 const pessoaMap = new Map();
 let pessoaCtr = 0;
@@ -59,7 +60,7 @@ const pessoaId = id => {
   return pessoaMap.get(id);
 };
 
-// compact row: [mesIdx, temaIdx, auth, dirIdx, areaIdx, turnoIdx, npsIdx, pessoaIdx]
+// compact row: [mesIdx, temaIdx, auth, dirIdx, areaIdx, turnoIdx, npsIdx, pessoaIdx, dataIdx]
 const DATA = rows.map(r => [
   LM.idx[r.mes],
   LT.idx[r.tema],
@@ -69,6 +70,7 @@ const DATA = rows.map(r => [
   LR.idx[r.turno],
   LN.idx[r.nps],
   pessoaId(r.id),
+  LF.idx[r.data],
 ]);
 
 const LOOKUP = {
@@ -78,10 +80,28 @@ const LOOKUP = {
   area:  LA.vals,
   turno: LR.vals,
   nps:   LN.vals,
+  data:  LF.vals,
 };
 
+// ── HC por diretoria (meta dinâmica) ─────────────────────────────────────────
+const hcPath = resolve(raiz, "dados", "hc-diretorias.csv");
+const HC_DATA = {};
+if (existsSync(hcPath)) {
+  readFileSync(hcPath, "utf8").split("\n").slice(1).forEach(l => {
+    const [dir, hc] = l.split(";").map(s => s.trim().replace(/\r$/, ""));
+    if (dir && hc) HC_DATA[dir] = parseInt(hc, 10);
+  });
+}
+const HC_TOTAL = Object.values(HC_DATA).reduce((a, b) => a + b, 0) || 6000;
+
+// ── Campanhas ────────────────────────────────────────────────────────────────
+const campPath = resolve(raiz, "dados", "campanhas.json");
+const CAMPANHAS = existsSync(campPath)
+  ? JSON.parse(readFileSync(campPath, "utf8"))
+  : [];
+
 // ── build HTML ───────────────────────────────────────────────────────────────
-const js_data = JSON.stringify({ LOOKUP, DATA });
+const js_data = JSON.stringify({ LOOKUP, DATA, HC_DATA, HC_TOTAL, CAMPANHAS });
 
 const html = `<!doctype html>
 <html lang="pt-BR">
@@ -316,6 +336,30 @@ button { font: inherit; cursor: pointer; }
 .trend-meta { margin-left: auto; font-size: 12px; color: var(--c-ink3); }
 .trend-chart { height: 90px; }
 
+/* ── TELA 5: Diário ── */
+.diario-header {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
+}
+.kpi-diario {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--radius); padding: 14px 20px; flex: 1; min-width: 160px;
+  box-shadow: var(--shadow);
+}
+.kpi-diario h4 { font-size: 11px; font-weight: 700; color: var(--c-ink3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.kpi-diario .val { font-size: 28px; font-weight: 800; letter-spacing: -.02em; color: var(--c-header); }
+.kpi-diario .val small { font-size: 13px; font-weight: 400; color: var(--c-ink3); margin-left: 3px; }
+.kpi-diario .sub { font-size: 11px; color: var(--c-ink3); margin-top: 3px; }
+.diario-chart-wrap { overflow-x: auto; padding-bottom: 4px; }
+.camp-legend {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;
+}
+.camp-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid; background: transparent;
+}
+.camp-pill .camp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
 /* ── botão exportar ── */
 .btn-exportar {
   display: inline-flex; align-items: center; gap: 6px;
@@ -357,6 +401,9 @@ button { font: inherit; cursor: pointer; }
   </button>
   <button class="tab-btn" data-tab="tendencias" role="tab">
     <span class="tab-icon">📈</span> Tendências
+  </button>
+  <button class="tab-btn" data-tab="diario" role="tab">
+    <span class="tab-icon">📅</span> Diário
   </button>
 </nav>
 
@@ -428,12 +475,28 @@ button { font: inherit; cursor: pointer; }
     <div class="trend-list" id="trend-list"></div>
   </section>
 
+  <!-- TELA 5 · Diário -->
+  <section class="screen" id="screen-diario">
+    <div class="diario-header" id="diario-header"></div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-faixa" id="diario-faixa"></div>
+      <div class="card-topo">
+        <h3 id="diario-titulo">Acessos por dia</h3>
+        <span class="chip" data-s="nd" id="diario-chip"></span>
+      </div>
+      <div class="diario-chart-wrap">
+        <svg id="diario-svg" style="width:100%;display:block;overflow:visible"></svg>
+      </div>
+    </div>
+    <div class="camp-legend" id="camp-legend"></div>
+  </section>
+
 </main>
 
 <script>
 // ── dados embeddados ─────────────────────────────────────────
-const { LOOKUP, DATA } = ${js_data};
-const F_MES=0,F_TEMA=1,F_AUTH=2,F_DIR=3,F_AREA=4,F_TURNO=5,F_NPS=6,F_PESSOA=7;
+const { LOOKUP, DATA, HC_DATA, HC_TOTAL, CAMPANHAS } = ${js_data};
+const F_MES=0,F_TEMA=1,F_AUTH=2,F_DIR=3,F_AREA=4,F_TURNO=5,F_NPS=6,F_PESSOA=7,F_DATA=8;
 const IDX_SI = LOOKUP.tema.indexOf("Sem Interação");
 const IDX_DIR_VAZIO   = LOOKUP.dir.indexOf("");
 const IDX_AREA_VAZIA  = LOOKUP.area.indexOf("");
@@ -454,6 +517,21 @@ const st  = (v,bom,atn) => v==null?"nd":v>=bom?"bom":v>=atn?"atencao":"critico";
 
 // estado
 const E = { mes:"2026-07", dir:"", area:"", tema:"", comSI:false, tela:"geral" };
+
+// ── meta efetiva (proporcional ao HC da diretoria) ────────────
+function metaEfetiva() {
+  if (E.dir && HC_DATA[E.dir] != null && HC_TOTAL > 0) {
+    return Math.max(1, Math.round(META_MENSAL * HC_DATA[E.dir] / HC_TOTAL));
+  }
+  return META_MENSAL;
+}
+function metaLabel() {
+  const m = metaEfetiva();
+  if (E.dir && HC_DATA[E.dir] != null) {
+    return "meta " + N0.format(m) + " (HC " + N0.format(HC_DATA[E.dir]) + ")";
+  }
+  return "meta " + N0.format(m);
+}
 
 // ── filtrar ────────────────────────────────────────────────────
 function filtrar() {
@@ -548,7 +626,8 @@ function drawCanalChart(mesIntCnt) {
   const entries = Object.entries(mesIntCnt).sort((a,b)=>a[0].localeCompare(b[0]));
   if (!entries.length) { svg.innerHTML = ""; return; }
 
-  const maxV = Math.max(META_MENSAL*1.1, ...entries.map(([,v])=>v));
+  const meta = metaEfetiva();
+  const maxV = Math.max(meta*1.1, ...entries.map(([,v])=>v));
   const pad = { t:30, r:16, b:36, l:8 };
   const cw = W-pad.l-pad.r, ch = H-pad.t-pad.b;
   const n = entries.length;
@@ -560,20 +639,20 @@ function drawCanalChart(mesIntCnt) {
 
   // grade sutil
   [0, 0.5, 1].forEach(f => {
-    const v = Math.round(META_MENSAL * f * 0.5);
-    const y = yx(META_MENSAL * f);
+    const v = Math.round(meta * f * 0.5);
+    const y = yx(meta * f);
     out += '<line x1="'+pad.l+'" y1="'+y.toFixed(1)+'" x2="'+(W-pad.r)+'" y2="'+y.toFixed(1)+'" stroke="#E2E7DF" stroke-width="1"/>';
   });
 
   // meta
-  const my = yx(META_MENSAL);
+  const my = yx(meta);
   out += '<line x1="'+pad.l+'" y1="'+my.toFixed(1)+'" x2="'+(W-pad.r)+'" y2="'+my.toFixed(1)+'" stroke="#B54728" stroke-width="1.5" stroke-dasharray="6,4"/>';
-  out += '<text x="'+(W-pad.r-2)+'" y="'+(my-4).toFixed(1)+'" text-anchor="end" font-size="11" fill="#B54728" font-weight="700">meta '+N0.format(META_MENSAL)+'</text>';
+  out += '<text x="'+(W-pad.r-2)+'" y="'+(my-4).toFixed(1)+'" text-anchor="end" font-size="11" fill="#B54728" font-weight="700">'+metaLabel()+'</text>';
 
   // barras
   entries.forEach(([m, v], i) => {
     const isCur = m === (E.mes||MES_ATUAL);
-    const fill = v>=META_MENSAL?"#00694A":v>=META_MENSAL*.75?"#877C00":"#B54728";
+    const fill = v>=meta?"#00694A":v>=meta*.75?"#877C00":"#B54728";
     const x = cx(i)-bw/2;
     const y = yx(v);
     const bh = H-pad.b-y;
@@ -659,15 +738,16 @@ function trendBarSVG(pontos, cfg) {
 
 // ── KPI cards (tela Visão Geral) ──────────────────────────────
 function cardVolume(ag) {
-  const pm=Math.min(1,ag.nInt/META_MENSAL);
-  const s=st(ag.nInt,META_MENSAL,META_MENSAL*.75);
-  const lbl=ag.nInt>=META_MENSAL?"✓ Meta atingida":ag.nInt>=META_MENSAL*.75?"▲ Quase lá":"✗ Abaixo da meta";
+  const meta=metaEfetiva();
+  const pm=Math.min(1,ag.nInt/meta);
+  const s=st(ag.nInt,meta,meta*.75);
+  const lbl=ag.nInt>=meta?"✓ Meta atingida":ag.nInt>=meta*.75?"▲ Quase lá":"✗ Abaixo da meta";
   return '<div class="card" data-s="'+s+'"><div class="card-faixa"></div>'+
     '<div class="card-topo"><h3>1 · Volume</h3><span class="chip" data-s="'+s+'">'+lbl+'</span></div>'+
     '<div class="kpi-valor">'+N0.format(ag.nInt)+'<small>int.</small></div>'+
-    '<div class="kpi-sub">Meta '+N0.format(META_MENSAL)+'/mês · '+N0.format(ag.pessoasInt)+' pessoas únicas</div>'+
+    '<div class="kpi-sub">'+metaLabel()+'/mês · '+N0.format(ag.pessoasInt)+' pessoas únicas</div>'+
     '<div class="barra-wrap"><div class="barra-track"><div class="barra-fill" style="width:'+(pm*100).toFixed(1)+'%"></div></div>'+
-    '<div class="barra-labels"><span>'+N0.format(ag.nInt)+'</span><span>meta '+N0.format(META_MENSAL)+'</span></div></div>'+
+    '<div class="barra-labels"><span>'+N0.format(ag.nInt)+'</span><span>'+metaLabel()+'</span></div></div>'+
     '<dl class="analises">'+
     '<div class="analise-row"><dt>Acessos totais</dt><dd>'+N0.format(ag.total)+'</dd></div>'+
     '<div class="analise-row"><dt>Sem interação</dt><dd class="'+(ag.si/ag.total>.5?"val-cri":ag.si/ag.total>.3?"val-atn":"val-bom")+'">'+pct(ag.total?ag.si/ag.total:0)+'</dd></div>'+
@@ -846,11 +926,11 @@ function renderTendencias() {
     {
       id:"vol", title:"1 · Volume", faixa:"var(--c-verde)",
       pontos:td.map(p=>({mes:p.mes,val:p.nInt})),
-      metaV:comTema?null:META_MENSAL, metaLabel:"meta "+N0.format(META_MENSAL),
-      colorFn:comTema?()=>"#1C6D96":v=>v>=META_MENSAL?"#00694A":v>=META_MENSAL*.75?"#877C00":"#B54728",
+      metaV:comTema?null:metaEfetiva(), metaLabel:metaLabel(),
+      colorFn:comTema?()=>"#1C6D96":v=>{const m=metaEfetiva();return v>=m?"#00694A":v>=m*.75?"#877C00":"#B54728";},
       fmtV:v=>v>=1000?N0.format(v):String(v),
-      stat:comTema?"Buscas pelo tema por mês":"Meta: "+N0.format(META_MENSAL)+" int./mês",
-      chipFn:v=>v==null?"nd":v>=META_MENSAL?"bom":v>=META_MENSAL*.75?"atencao":"critico",
+      stat:comTema?"Buscas pelo tema por mês":"Meta: "+metaLabel()+" int./mês",
+      chipFn:v=>{if(v==null)return"nd";const m=metaEfetiva();return v>=m?"bom":v>=m*.75?"atencao":"critico";},
     },
     {
       id:"eng", title:comTema?"2 · Participação":"2 · Engajamento", faixa:"var(--c-verde)",
@@ -914,6 +994,147 @@ function renderTendencias() {
   }).join("");
 }
 
+// ── tela Diário ───────────────────────────────────────────────
+function calcularDiario() {
+  if (!E.mes) return { days:[], daysInMonth:0, total:0, peak:0, peakDay:"", avg:0, aboveMeta:0, dailyMeta:0 };
+  const rows = filtrar(); // já filtra por mes/dir/area
+  const [ano, mesNum] = E.mes.split("-").map(Number);
+  const daysInMonth = new Date(ano, mesNum, 0).getDate();
+  const counts = {};
+  rows.forEach(r => {
+    const d = LOOKUP.data ? LOOKUP.data[r[F_DATA]] : null;
+    if (d) counts[d] = (counts[d]||0) + 1;
+  });
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dd = String(d).padStart(2,"0");
+    const key = E.mes+"-"+dd;
+    days.push({ date:key, day:d, count:counts[key]||0 });
+  }
+  const total = days.reduce((a,b)=>a+b.count,0);
+  const meta = metaEfetiva();
+  const dailyMeta = meta / daysInMonth;
+  const peakCount = Math.max(...days.map(d=>d.count), 0);
+  const peakDay = days.find(d=>d.count===peakCount) || null;
+  const avg = total / daysInMonth;
+  const aboveMeta = days.filter(d=>d.count>=dailyMeta).length;
+  return { days, daysInMonth, total, peak:peakCount, peakDay:peakDay?peakDay.date:"", avg, aboveMeta, dailyMeta };
+}
+
+function drawDiarioChart(days, daysInMonth, dailyMeta, avg) {
+  const svg = document.getElementById("diario-svg");
+  const minW = Math.max(600, daysInMonth * 28);
+  svg.style.minWidth = minW+"px";
+  const W = minW, H = 220;
+  const pad = { t:38, r:20, b:44, l:38 };
+  const cw = W-pad.l-pad.r, ch = H-pad.t-pad.b;
+  const maxV = Math.max(dailyMeta*2, avg*2, ...days.map(d=>d.count), 1);
+  const bw = Math.max(12, Math.min(34, (cw/daysInMonth)*0.65));
+  const yx = v => H-pad.b-(v/maxV)*ch;
+  const cx = i => pad.l+(i+0.5)*(cw/daysInMonth);
+
+  const campsMes = (CAMPANHAS||[]).filter(c=>c.data&&c.data.startsWith(E.mes));
+  const campMap = {};
+  campsMes.forEach(c=>{ campMap[c.data]=(campMap[c.data]||[]); campMap[c.data].push(c); });
+
+  let out = "";
+
+  // grade horizontal sutil com labels eixo Y
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f=>Math.round(maxV*f));
+  ticks.forEach(v=>{
+    const y = yx(v);
+    out += '<line x1="'+pad.l+'" y1="'+y.toFixed(1)+'" x2="'+(W-pad.r)+'" y2="'+y.toFixed(1)+'" stroke="#E2E7DF" stroke-width="1"/>';
+    out += '<text x="'+(pad.l-6)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" font-size="9" fill="#9BAD9A">'+N0.format(v)+'</text>';
+  });
+
+  // linhas verticais de campanhas (fundo)
+  campsMes.forEach((c,ci)=>{
+    const x = cx(parseInt(c.data.slice(8),10)-1);
+    out += '<line x1="'+x.toFixed(1)+'" y1="'+pad.t+'" x2="'+x.toFixed(1)+'" y2="'+(H-pad.b)+'" stroke="'+c.cor+'" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.65"/>';
+  });
+
+  // barras
+  days.forEach((d,i)=>{
+    const fill = d.count>=dailyMeta?"#00694A":d.count>=dailyMeta*.5?"#877C00":"#B54728";
+    const x = cx(i)-bw/2;
+    const y = yx(d.count);
+    const bh = Math.max(1,H-pad.b-y);
+    out += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+bh.toFixed(1)+'" fill="'+fill+'" rx="3"/>';
+    // rótulo valor: exibir em campanhas, pico e barras altas
+    const isCamp = !!campMap[d.date];
+    const isPeak = d.count===Math.max(...days.map(x=>x.count)) && d.count>0;
+    if (d.count>0 && (isPeak||isCamp||d.count>=avg*1.25)) {
+      out += '<text x="'+cx(i).toFixed(1)+'" y="'+(y-4).toFixed(1)+'" text-anchor="middle" font-size="9" font-weight="700" fill="'+fill+'">'+d.count+'</text>';
+    }
+    // eixo X — dia (a cada 5 dias + dia 1 + campanhas)
+    if (d.day===1||d.day%5===0||d.day===daysInMonth||isCamp) {
+      out += '<text x="'+cx(i).toFixed(1)+'" y="'+(H-pad.b+13).toFixed(1)+'" text-anchor="middle" font-size="9" fill="'+(isCamp?"#6B7870":"#9BAD9A")+'">'+d.day+'</text>';
+    }
+  });
+
+  // rótulos de campanha no topo
+  campsMes.forEach((c,ci)=>{
+    const x = cx(parseInt(c.data.slice(8),10)-1);
+    const labelY = (pad.t-6-(ci%2)*13).toFixed(1);
+    out += '<text x="'+x.toFixed(1)+'" y="'+labelY+'" text-anchor="middle" font-size="8.5" font-weight="700" fill="'+c.cor+'">'+c.nome.slice(0,18)+'</text>';
+    out += '<circle cx="'+x.toFixed(1)+'" cy="'+(H-pad.b)+'" r="3.5" fill="'+c.cor+'"/>';
+  });
+
+  // linha alvo diário
+  const ty = yx(dailyMeta);
+  out += '<line x1="'+pad.l+'" y1="'+ty.toFixed(1)+'" x2="'+(W-pad.r)+'" y2="'+ty.toFixed(1)+'" stroke="#B54728" stroke-width="1.5" stroke-dasharray="5,3"/>';
+  out += '<text x="'+(W-pad.r-2)+'" y="'+(ty-4).toFixed(1)+'" text-anchor="end" font-size="9" font-weight="700" fill="#B54728">alvo '+dailyMeta.toFixed(0)+'/dia</text>';
+
+  // linha média
+  const ay = yx(avg);
+  out += '<line x1="'+pad.l+'" y1="'+ay.toFixed(1)+'" x2="'+(W-pad.r)+'" y2="'+ay.toFixed(1)+'" stroke="#1C6D96" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.8"/>';
+  out += '<text x="'+(pad.l+4)+'" y="'+(ay-4).toFixed(1)+'" text-anchor="start" font-size="9" fill="#1C6D96">méd '+avg.toFixed(0)+'/dia</text>';
+
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  svg.setAttribute("height",H);
+  svg.innerHTML = out;
+}
+
+function renderDiario() {
+  if (!E.mes) {
+    document.getElementById("diario-header").innerHTML = '<p style="color:var(--c-ink3);font-size:14px;padding:8px 0">Selecione um mês para ver o acompanhamento diário.</p>';
+    document.getElementById("diario-chip").textContent=""; document.getElementById("diario-chip").dataset.s="nd";
+    document.getElementById("diario-faixa").style.background="var(--c-ink3)";
+    document.getElementById("diario-svg").innerHTML="";
+    document.getElementById("camp-legend").innerHTML="";
+    return;
+  }
+  const { days, daysInMonth, total, peak, peakDay, avg, aboveMeta, dailyMeta } = calcularDiario();
+  const meta = metaEfetiva();
+  const s = st(total, meta, meta*.75);
+  const colors = { bom:"var(--c-verde)", atencao:"var(--c-amarelo)", critico:"var(--c-cri)", nd:"var(--c-ink3)" };
+
+  document.getElementById("diario-faixa").style.background = colors[s]||colors.nd;
+  document.getElementById("diario-chip").dataset.s = s;
+  document.getElementById("diario-chip").textContent = total>=meta?"✓ Meta atingida":total>=meta*.75?"▲ Quase lá":"✗ Abaixo da meta";
+  document.getElementById("diario-titulo").textContent = "Acessos por dia — "+mesFmt(E.mes);
+
+  const peakDayFmt = peakDay ? peakDay.slice(8)+"/"+peakDay.slice(5,7) : "—";
+  const pctAcima = daysInMonth ? Math.round(aboveMeta/daysInMonth*100) : 0;
+  document.getElementById("diario-header").innerHTML =
+    '<div class="kpi-diario"><h4>Total do mês</h4><div class="val">'+N0.format(total)+'<small>int.</small></div><div class="sub">'+metaLabel()+'</div></div>'+
+    '<div class="kpi-diario"><h4>Pico diário</h4><div class="val">'+N0.format(peak)+'<small>dia '+peakDayFmt+'</small></div><div class="sub">dia de maior volume</div></div>'+
+    '<div class="kpi-diario"><h4>Média / dia</h4><div class="val">'+Math.round(avg)+'<small>int.</small></div><div class="sub">alvo '+Math.round(dailyMeta)+'/dia</div></div>'+
+    '<div class="kpi-diario"><h4>Dias ≥ alvo</h4><div class="val">'+aboveMeta+'<small>/'+daysInMonth+'</small></div><div class="sub">'+pctAcima+'% dos dias do mês</div></div>';
+
+  drawDiarioChart(days, daysInMonth, dailyMeta, avg);
+
+  // legenda campanhas do mês
+  const campsMes = (CAMPANHAS||[]).filter(c=>c.data&&c.data.startsWith(E.mes));
+  document.getElementById("camp-legend").innerHTML = campsMes.length
+    ? '<p style="font-size:11px;font-weight:700;color:var(--c-ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Campanhas do mês</p>'+
+      campsMes.map(c=>'<div class="camp-pill" style="border-color:'+c.cor+';color:'+c.cor+'">'+
+        '<div class="camp-dot" style="background:'+c.cor+'"></div>'+
+        c.data.slice(8)+'/'+c.data.slice(5,7)+' · <strong>'+c.nome+'</strong> · '+c.canal+
+      '</div>').join("")
+    : '<p style="font-size:12px;color:var(--c-ink3)">Nenhuma campanha registrada para este mês. Edite <code>dados/campanhas.json</code> para adicionar.</p>';
+}
+
 // ── render principal ──────────────────────────────────────────
 function render() {
   const linhas=filtrar();
@@ -940,6 +1161,9 @@ function render() {
 
   // tela Tendências
   renderTendencias();
+
+  // tela Diário
+  renderDiario();
 }
 
 // ── navegação de abas ─────────────────────────────────────────
@@ -950,6 +1174,7 @@ document.querySelectorAll(".tab-btn").forEach(btn=>{
     document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("ativo",b===btn));
     document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("ativa",s.id==="screen-"+tela));
     if (tela==="canal") setTimeout(()=>{ drawCanalChart(calcular(filtrar()).mesIntCnt); },50);
+    if (tela==="diario") setTimeout(()=>{ renderDiario(); },50);
   });
 });
 
